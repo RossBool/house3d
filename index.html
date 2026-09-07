@@ -40,6 +40,14 @@
   .floor-btn.on{background:var(--ink);color:#f4efe4}
   .floor-btn.on i{color:#d9c9a8}
 
+  /* ---- VR 漫游 HUD ---- */
+  #vrChip{
+    position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:20;display:none;
+    background:rgba(38,34,26,.88);color:#f4efe4;font-size:12.5px;letter-spacing:.08em;
+    padding:6px 16px;border-radius:999px;pointer-events:none;font-family:"Noto Serif SC",serif;
+    backdrop-filter:blur(6px);
+  }
+
   /* ---- 建模加载遮罩 ---- */
   #loading{
     position:fixed;inset:0;z-index:100;background:var(--paper);
@@ -229,6 +237,7 @@
 </div>
 <div id="stage"></div>
 <canvas id="planCanvas"></canvas>
+<div id="vrChip"></div>
 <div id="hoverChip"></div>
 
 <div id="brand">
@@ -250,6 +259,7 @@
   <button class="tbtn on" id="btnFurn">家具 · 显</button>
   <div class="vline"></div>
   <button class="tbtn mobile-only" id="btnRooms">房间</button>
+  <button class="tbtn" id="btnVR">VR 漫游</button>
   <button class="tbtn" id="btnPlan">平面图</button>
   <button class="tbtn" id="btnReset">总览</button>
 </div>
@@ -266,11 +276,11 @@
 
 <div id="floorStrip"></div>
 
-<div id="hint">左键拖拽旋转 · 滚轮缩放 · <b>点击房间/家具</b>查看讲解 · <b>右侧切换楼层</b> · 快捷键 <b>1/2/3</b> 材质 <b>N</b> 昼夜 <b>F</b> 家具 <b>P</b> 平面图 <b>R</b> 复位</div>
+<div id="hint">左键拖拽旋转 · 滚轮缩放 · <b>点击房间/家具</b>查看讲解 · <b>VR 漫游</b>：拖拽环视/点地行走 · <b>右侧切换楼层</b> · 快捷键 <b>1/2/3</b> 材质 <b>N</b> 昼夜 <b>F</b> 家具 <b>P</b> 平面图 <b>R</b> 复位</div>
 
-<script src="./data.js"></script>
+<script src="./data.js?v=4"></script>
 <script type="importmap">{ "imports": { "three": "./libs/three.module.js" } }</script>
-<script type="module" src="./app.js"></script>
+<script type="module" src="./app.js?v=4"></script>
 <script>
   window.__errs = [];
   window.addEventListener('error', e => window.__errs.push(e.message + ' @' + (e.filename||'') + ':' + e.lineno));
