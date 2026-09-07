@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>周湍淇住宅楼 · 九层平面（26.900）互动模型</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -39,6 +39,16 @@
   .floor-btn:hover{background:rgba(181,68,45,.08)}
   .floor-btn.on{background:var(--ink);color:#f4efe4}
   .floor-btn.on i{color:#d9c9a8}
+
+  /* ---- 建模加载遮罩 ---- */
+  #loading{
+    position:fixed;inset:0;z-index:100;background:var(--paper);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+    transition:opacity .45s;
+  }
+  #loading.done{opacity:0;pointer-events:none}
+  #loading .seal{width:64px;height:64px;font-size:26px;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
   /* ---- 悬停提示 ---- */
   #hoverChip{
@@ -158,15 +168,65 @@
   body.is-night #brand .meta h1{color:#e8e2d2}
   body.is-night #hint,body.is-night #bInfo p{color:#b7b0a0}
 
-  @media (max-width:900px){
-    #sidebar{display:none}
-    #infoPanel{width:min(330px,calc(100vw - 40px))}
-    #toolbar{flex-wrap:wrap;justify-content:center;max-width:92vw;top:auto;bottom:64px}
+  .mobile-only{display:none}
+
+  /* ---- 移动端：底部导航 + 底部弹层 ---- */
+  @media (max-width:860px){
+    #brand{top:10px;left:10px}
+    #brand .seal{width:42px;height:42px;font-size:17px}
+    #brand .meta h1{font-size:15px}
+    #brand .meta p{font-size:10px}
     #hint{display:none}
+    #hoverChip{display:none !important}
+
+    /* 底部工具条：单行横向滚动，拇指可达 */
+    #toolbar{
+      top:auto;bottom:calc(8px + env(safe-area-inset-bottom));
+      left:8px;right:8px;transform:none;max-width:none;
+      flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+      padding:6px;gap:6px;
+    }
+    #toolbar::-webkit-scrollbar{display:none}
+    .mobile-only{display:inline-block;flex:0 0 auto}
+    .seg button,.tbtn{font-size:12px;padding:7px 11px;white-space:nowrap;flex:0 0 auto}
+    .vline{flex:0 0 auto}
+
+    /* 楼层切换：工具条上方横向胶囊条 */
+    #floorStrip{
+      flex-direction:row;overflow-x:auto;scrollbar-width:none;
+      top:auto;bottom:calc(64px + env(safe-area-inset-bottom));
+      left:8px;right:8px;transform:none;max-width:none;
+      padding:4px;gap:3px;
+    }
+    #floorStrip::-webkit-scrollbar{display:none}
+    .floor-btn{min-width:48px;flex:0 0 auto;padding:3px 6px}
+    .floor-btn i{font-size:8px}
+
+    /* 房间索引：底部弹层（工具条“房间”按钮开关） */
+    #sidebar{
+      display:flex;left:8px;right:8px;width:auto;top:auto;
+      bottom:calc(120px + env(safe-area-inset-bottom));
+      max-height:44dvh;
+      transform:translateY(130%);transition:transform .32s cubic-bezier(.2,.8,.2,1);
+    }
+    #sidebar.open{transform:none}
+
+    /* 讲解卡：底部弹层 */
+    #infoPanel{
+      left:8px;right:8px;width:auto;top:auto;
+      bottom:calc(8px + env(safe-area-inset-bottom));
+      max-height:62dvh;padding:16px 18px;
+    }
+    #infoPanel.open{transform:none}
+    #loading .seal{width:54px;height:54px;font-size:22px}
   }
 </style>
 </head>
 <body>
+<div id="loading">
+  <div class="seal">宅</div>
+  <div>正在等比建模 · 负一层至屋面层</div>
+</div>
 <div id="stage"></div>
 <canvas id="planCanvas"></canvas>
 <div id="hoverChip"></div>
@@ -189,6 +249,7 @@
   <button class="tbtn" id="btnNight">☀️ 白天</button>
   <button class="tbtn on" id="btnFurn">家具 · 显</button>
   <div class="vline"></div>
+  <button class="tbtn mobile-only" id="btnRooms">房间</button>
   <button class="tbtn" id="btnPlan">平面图</button>
   <button class="tbtn" id="btnReset">总览</button>
 </div>
