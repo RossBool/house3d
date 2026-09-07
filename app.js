@@ -11,12 +11,18 @@ const $ = s => document.querySelector(s);
 /* ---------- 渲染器 / 场景 ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false, powerPreference: 'high-performance' });
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || innerWidth < 860;
-renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.6 : 2));
+renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio, IS_MOBILE ? 1 : 1.5), IS_MOBILE ? 1.6 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 document.getElementById('stage').appendChild(renderer.domElement);
+/* 窗口/分栏尺寸变化：同步画布缓冲与相机纵横比（避免拉伸模糊与纵横比错乱） */
+addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  perspCam.aspect = innerWidth / innerHeight;
+  perspCam.updateProjectionMatrix();
+});
 
 const scene = new THREE.Scene();
 
@@ -84,11 +90,14 @@ const MAT = {
   rattan: std(0xb08d5f, 0.85),
   water: std(0x9fc4d0, 0.2, 0.1),
 };
-const POLY = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
+/* 防频闪：面统一推后深度，让共面构造的描边线恒赢深度测试（否则运动时棱线马赛克闪烁） */
+const FACE_OFFSET = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 3 };
+Object.values(MAT).forEach(m => { if (m.isMeshStandardMaterial) Object.assign(m, FACE_OFFSET); });
+const POLY = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 3 };
 const whiteMat = std(0xf2f0eb, 0.94); Object.assign(whiteMat, POLY);
-const whiteGlass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, transparent: true, opacity: 0.14, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-const wireBasic = new THREE.MeshBasicMaterial({ color: 0xf8f5ed, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-const wireGlass = new THREE.MeshBasicMaterial({ color: 0xdfe7ec, transparent: true, opacity: 0.22, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const whiteGlass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, transparent: true, opacity: 0.14, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 3 });
+const wireBasic = new THREE.MeshBasicMaterial({ color: 0xf8f5ed, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 3 });
+const wireGlass = new THREE.MeshBasicMaterial({ color: 0xdfe7ec, transparent: true, opacity: 0.22, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 3 });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x2a2620 });
 /* 门洞穿越光环 */
 const hotTexture = (() => {
@@ -1376,9 +1385,9 @@ function loop() {
     controls.update();
   }
   if (!planMode) {
-    /* 动态 near：near ≈ 视距 1.5%，保证模型所在深度的精度恒定（缩放不再触发深度争抢） */
+    /* 动态 near：near ≈ 视距 3%，深度量化噪声减半，抑制掠射角共享棱边的次采样深度打平闪烁 */
     const dc = perspCam.position.distanceTo(controls.target);
-    const nr = THREE.MathUtils.clamp(dc * 0.015, 0.15, 2.5);
+    const nr = THREE.MathUtils.clamp(dc * 0.03, 0.15, 2.5);
     if (Math.abs(perspCam.near - nr) > 0.005) {
       perspCam.near = nr; perspCam.far = nr + 260;
       perspCam.updateProjectionMatrix();
