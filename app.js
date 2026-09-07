@@ -9,7 +9,7 @@ const PX = (x, y) => new THREE.Vector3(x, 0, y);
 const $ = s => document.querySelector(s);
 
 /* ---------- 渲染器 / 场景 ---------- */
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false, powerPreference: 'high-performance' });
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || innerWidth < 860;
 renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.6 : 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -58,7 +58,7 @@ scene.add(sun.target);
 /* ---------- 材质 ---------- */
 const std = (c, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 const MAT = {
-  extWall: std(0xe7dfcd, 0.92),
+  extWall: std(0xf0ece2, 0.92),
   intWall: std(0xf1ece0, 0.95),
   parapet: std(0xd9d2c0, 0.9),
   slab: std(0xcbc4b2, 0.9),
@@ -121,8 +121,14 @@ const TYPE_NAME = {
    ============================================================ */
 const floorObjs = {};   // id -> {group, solid, edge, furn, lights, pickables, data}
 
+const geoCache = new Map();
+function boxGeo(w, h, d) {
+  const k = w.toFixed(3) + '|' + h.toFixed(3) + '|' + d.toFixed(3);
+  if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d));
+  return geoCache.get(k);
+}
 function box(w, h, d, mat, x, yBase, z, ry = 0, parent, shadows = true) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  const m = new THREE.Mesh(boxGeo(w, h, d), mat);
   m.position.set(x, yBase + h / 2, z);
   m.rotation.y = ry;
   m.castShadow = shadows; m.receiveShadow = true;
@@ -1470,6 +1476,22 @@ window.__step = (n = 1) => {
 window.__app = { setMode, setNight, togglePlan, enterVR, exitVR, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
 /* 全楼层最终去穿插（在所有组装完成后统一执行） */
 for (const id in floorObjs) decollideFloor(floorObjs[id].solid, floorObjs[id].furn);
+
+/* 性能优化：静态网格冻结世界矩阵（渲染期免每帧矩阵分解） */
+for (const id in floorObjs) {
+  const o = floorObjs[id];
+  [o.solid, o.edge, o.furn].forEach(root => root.traverse(x => {
+    x.updateMatrix();
+    x.matrixAutoUpdate = false;
+  }));
+}
+
+window.__perf = () => ({
+  calls: renderer.info.render.calls,
+  tris: renderer.info.render.triangles,
+  geoms: renderer.info.memory.geometries,
+  programs: renderer.info.programs ? renderer.info.programs.length : 0,
+});
 window.__auditHelper = { Box3: THREE.Box3, V3: THREE.Vector3 };
 window.__app.floorObjs = floorObjs;
 window.__app.decollideFloor = decollideFloor;
