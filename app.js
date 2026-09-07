@@ -196,7 +196,7 @@ function buildWall(parent, w) {
   const ang = Math.atan2(dir.z, dir.x);
   const g = new THREE.Group();
   g.name = 'wall:' + (w.name || '墙');
-  g.position.copy(A);
+  g.position.copy(A).addScaledVector(dir, 0.5);   // 局部原点=墙中点（下方构件按 opCoord−L/2 摆放）
   g.rotation.y = -ang;
   const t = w.t, H = w.h;
   const wallMat = w.parapet ? MAT.parapet : (w.name.includes('外') || w.name.includes('女儿') ? MAT.extWall : MAT.intWall);
