@@ -10,7 +10,8 @@ const $ = s => document.querySelector(s);
 
 /* ---------- 渲染器 / 场景 ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const IS_MOBILE = matchMedia('(pointer: coarse)').matches || innerWidth < 860;
+renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.6 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -42,7 +43,8 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2dd, 3.0);
 sun.position.set(26, 32, 10);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048);
+sun.shadow.normalBias = 0.02;
 sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
 sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
 sun.shadow.camera.far = 100;
@@ -82,10 +84,11 @@ const MAT = {
   rattan: std(0xb08d5f, 0.85),
   water: std(0x9fc4d0, 0.2, 0.1),
 };
-const whiteMat = std(0xf2f0eb, 0.94);
-const whiteGlass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, transparent: true, opacity: 0.14 });
-const wireBasic = new THREE.MeshBasicMaterial({ color: 0xf8f5ed });
-const wireGlass = new THREE.MeshBasicMaterial({ color: 0xdfe7ec, transparent: true, opacity: 0.22 });
+const POLY = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
+const whiteMat = std(0xf2f0eb, 0.94); Object.assign(whiteMat, POLY);
+const whiteGlass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, transparent: true, opacity: 0.14, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const wireBasic = new THREE.MeshBasicMaterial({ color: 0xf8f5ed, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const wireGlass = new THREE.MeshBasicMaterial({ color: 0xdfe7ec, transparent: true, opacity: 0.22, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x2a2620 });
 
 /* ---------- 家具类型名 ---------- */
@@ -132,7 +135,7 @@ function buildWindow(g, cx, op, t) {
   const glass = new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, h - 0.08, 0.02), MAT.glass);
   glass.position.set(cx, s + h / 2, 0);
   g.add(glass);
-  box(w + 0.1, 0.04, t + 0.12, MAT.marble, cx, s - 0.04, 0, 0, g, false);
+  box(w + 0.1, 0.04, t + 0.12, MAT.marble, cx, s - 0.02, 0, 0, g, false);
 }
 function buildDoor(g, cx, op, t) {
   const { w, h } = op;
@@ -200,11 +203,11 @@ function buildWall(parent, w) {
 function buildStairs(parent) {
   const g = new THREE.Group();
   const stepMat = MAT.marble;
-  box(1.9, 0.15, 1.2, stepMat, 1.25, -0.15, 6.2, 0, g);
+  box(1.9, 0.15, 1.2, stepMat, 1.25, -0.13, 6.2, 0, g);
   for (let i = 0; i < 10; i++) box(0.9, (i + 1) * 0.16, 0.26, stepMat, 0.75, 0, 6.8 + i * 0.26 + 0.13, 0, g);
-  box(1.9, 1.6, 0.8, stepMat, 1.25, 0, 9.0, 0, g);
+  box(1.9, 1.61, 0.8, stepMat, 1.25, 0, 9.0, 0, g);
   for (let i = 0; i < 10; i++) box(0.9, 1.6 + (i + 1) * 0.16, 0.26, stepMat, 1.75, 0, 8.6 - i * 0.26 - 0.13, 0, g);
-  box(1.0, 0.15, 1.3, stepMat, 1.7, 3.05, 6.2, 0, g);
+  box(1.0, 0.15, 1.3, stepMat, 1.7, 3.06, 6.2, 0, g);
   function rail(x, y1, z1, y2, z2) {
     const len = Math.hypot(y2 - y1, z2 - z1);
     const r = box(0.05, 0.05, len, MAT.woodDark, x, 0, 0, 0, g, false);
@@ -238,7 +241,7 @@ function buildB1Stairs(parent) {
   for (let i = 0; i < 10; i++) {
     box(1.0, 3.0 - i * 0.3, 0.22, stepMat, 4.3, 0, 7.6 - i * 0.22 - 0.11, 0, g);
   }
-  box(1.2, 0.15, 1.1, stepMat, 4.3, -0.15, 7.9, 0, g);
+  box(1.2, 0.15, 1.1, stepMat, 4.3, -0.13, 7.9, 0, g);
   parent.add(g);
 }
 
@@ -476,11 +479,12 @@ FLOORS.forEach(F0 => {
   walls.forEach(w => buildWall(solid, w));
 
   /* 楼板 */
+  let slabIdx = 0;
   F0.rooms.forEach(r => {
     const [x1, y1, x2, y2] = r.bbox;
     const fm = FLOOR_MATS[r.floor];
     const m = new THREE.Mesh(new THREE.BoxGeometry(x2 - x1, 0.14, y2 - y1), std(fm.color, fm.rough));
-    m.position.set((x1 + x2) / 2, -0.07, (y1 + y2) / 2);
+    m.position.set((x1 + x2) / 2, -0.07 - (slabIdx++) * 0.001, (y1 + y2) / 2);
     m.receiveShadow = true;
     m.userData = { pick: 'room', room: r, floorId: F0.id };
     solid.add(m);
@@ -1027,6 +1031,7 @@ $('#modeSeg').addEventListener('click', e => {
 $('#btnNight').onclick = () => setNight(!night);
 $('#btnFurn').onclick = () => { const f = activeFloor().furn; f.visible = !f.visible; syncUI(); };
 $('#btnPlan').onclick = () => togglePlan();
+$('#btnRooms').onclick = () => $('#sidebar').classList.toggle('open');
 $('#btnReset').onclick = resetView;
 
 /* 楼层切换器 */
@@ -1064,7 +1069,10 @@ addEventListener('keydown', e => {
   if (e.key === 'r' || e.key === 'R') resetView();
 });
 
+let lastW = innerWidth, lastH = innerHeight;
 addEventListener('resize', () => {
+  if (innerWidth === lastW && innerHeight === lastH) return;
+  lastW = innerWidth; lastH = innerHeight;
   renderer.setSize(innerWidth, innerHeight);
   perspCam.aspect = innerWidth / innerHeight;
   perspCam.updateProjectionMatrix();
@@ -1076,12 +1084,18 @@ addEventListener('resize', () => {
 dispatchEvent(new Event('resize'));
 
 /* ---------- 主循环 ---------- */
+let booted = false;
 function loop() {
   requestAnimationFrame(loop);
   tickFly();
   controls.update();
   renderer.render(scene, activeCam);
   if (planMode) drawPlan();
+  if (!booted) {
+    booted = true;
+    const L = document.getElementById('loading');
+    if (L) { L.classList.add('done'); setTimeout(() => L.remove(), 450); }
+  }
 }
 solidApplyEnv();
 switchFloor('f9');
