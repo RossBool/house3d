@@ -160,7 +160,7 @@ function stdFloor(z, level) {
     ],
     furniture: [
       { type: 'bed', pos: [3.6, 1.9], rot: 0 },
-      { type: 'bed', pos: [6.1, 2.0], rot: 0 },
+      { type: 'bed', pos: [6.1, 2.0], rot: 0, s: 0.85 },
       { type: 'bed', pos: [3.9, 7.4], rot: Math.PI },
       { type: 'bed', pos: [1.25, 16.6], rot: 0 },
       { type: 'bed', pos: [6.9, 16.7], rot: 0 },
