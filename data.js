@@ -46,8 +46,10 @@ function stdFloor(z, level) {
       { a: [0, 0], b: [10.6, 0], t: 0.2, h: H_STD, name: '北外墙', ops: [
         { o: 0.65, w: 0.7, s: 0.9, h: 1.4, type: 'win', code: 'C0714' },
         { o: 1.85, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
-        { o: 5.30, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
-        { o: 6.10, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
+        { o: 3.85, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
+        { o: 6.10, w: 1.5, s: 0.9, h: 1.8, type: 'win', code: 'C1518' },
+        { o: 8.00, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
+        { o: 9.80, w: 2.0, s: 0.9, h: 1.8, type: 'win', code: 'C2018' },
       ]},
       { a: [10.6, 0], b: [10.6, 18.4], t: 0.2, h: H_STD, name: '东外墙', ops: [
         { o: 2.80, w: 3.0, s: 0.9, h: 1.8, type: 'win', code: 'C3018' },
@@ -186,8 +188,8 @@ function bigFloor(z, level) {
     walls: [
       { a: [0, 0], b: [10.6, 0], t: 0.2, h: H_STD, name: '北外墙', ops: [
         { o: 0.65, w: 0.7, s: 0.9, h: 1.4, type: 'win', code: 'C0714' },
-        { o: 2.30, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
-        { o: 3.75, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
+        { o: 1.25, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
+        { o: 3.70, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
         { o: 6.60, w: 0.7, s: 0.9, h: 1.4, type: 'win', code: 'C0714' },
       ]},
       { a: [10.6, 0], b: [10.6, 18.4], t: 0.2, h: H_STD, name: '东外墙', ops: [
