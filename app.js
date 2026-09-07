@@ -90,6 +90,18 @@ const whiteGlass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 
 const wireBasic = new THREE.MeshBasicMaterial({ color: 0xf8f5ed, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const wireGlass = new THREE.MeshBasicMaterial({ color: 0xdfe7ec, transparent: true, opacity: 0.22, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x2a2620 });
+/* 门洞穿越光环 */
+const hotTexture = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.beginPath(); x.arc(64, 64, 52, 0, 7);
+  x.strokeStyle = 'rgba(181,68,45,.95)'; x.lineWidth = 10; x.stroke();
+  x.beginPath(); x.arc(64, 64, 22, 0, 7);
+  x.fillStyle = 'rgba(244,239,228,.95)'; x.fill();
+  const t = new THREE.CanvasTexture(c);
+  return t;
+})();
+const hotMat = new THREE.SpriteMaterial({ map: hotTexture, transparent: true, depthTest: true, opacity: 0.95 });
 const exitSignMat = new THREE.MeshStandardMaterial({ color: 0x0b3d22, roughness: 0.5, emissive: 0x18e05a, emissiveIntensity: 0 });
 
 /* ---------- 家具类型名 ---------- */
@@ -475,7 +487,9 @@ FLOORS.forEach(F0 => {
   const furn = new THREE.Group();
   const pickables = [];
   const lights = [];
-  group.add(solid, edge, furn);
+  const hot = new THREE.Group();
+  hot.visible = false;
+  group.add(solid, edge, furn, hot);
   scene.add(group);
 
   /* 墙体 */
@@ -531,7 +545,8 @@ FLOORS.forEach(F0 => {
     F[f.type] && F[f.type](g);
   });
 
-  floorObjs[F0.id] = { group, solid, edge, furn, lights, pickables, data: F0 };
+  buildHotspots(hot, F0, pickables);
+  floorObjs[F0.id] = { group, solid, edge, furn, hot, lights, pickables, data: F0 };
 });
 
 /* ---------- 场地 ---------- */
@@ -615,7 +630,10 @@ function setNight(v) {
 function switchFloor(id) {
   activeId = id;
   const F0 = activeFloor().data;
-  for (const k in floorObjs) floorObjs[k].group.visible = (k === id);
+  for (const k in floorObjs) {
+    floorObjs[k].group.visible = (k === id);
+    floorObjs[k].hot.visible = vr.on && (k === id);
+  }
   if (night) setNight(true);
   /* 场地高度 */
   const gy = id === 'fb1' ? -3.7 : -0.6;
@@ -627,8 +645,15 @@ function switchFloor(id) {
   sun.target.updateMatrixWorld();
   sunFill.position.set(-18, z + 14, -22);
   /* 相机 */
-  perspCam.position.set(21, z + 16, 30);
-  controls.target.set(5.3, z + 0.5, 9.5);
+  if (vr.on) {
+    const v = vrDefaultView();
+    perspCam.position.copy(v.pos);
+    vr.yaw = v.yaw; vr.pitch = v.pitch;
+    applyLook();
+  } else {
+    perspCam.position.set(21, z + 16, 30);
+    controls.target.set(5.3, z + 0.5, 9.5);
+  }
   hlBox.visible = false;
   $('#infoPanel').classList.remove('open');
   buildRoomList();
@@ -675,7 +700,7 @@ function pickAt(cx, cy) {
   return null;
 }
 renderer.domElement.addEventListener('pointermove', e => {
-  if (planMode) { chip.style.display = 'none'; return; }
+  if (planMode || vr.on) { chip.style.display = 'none'; return; }
   const o = pickAt(e.clientX, e.clientY);
   if (o) {
     const bb = new THREE.Box3().setFromObject(o);
@@ -687,9 +712,42 @@ renderer.domElement.addEventListener('pointermove', e => {
   } else { hlBox.visible = false; chip.style.display = 'none'; }
 });
 let downXY = null;
-renderer.domElement.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
+const vrPointers = new Map();
+let pinchDist = 0;
+renderer.domElement.addEventListener('pointerdown', e => {
+  downXY = [e.clientX, e.clientY];
+  if (!vr.on) return;
+  vrPointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (vrPointers.size === 2) {
+    const pts = [...vrPointers.values()];
+    pinchDist = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
+  }
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!vr.on || !vrPointers.has(e.pointerId)) return;
+  const prev = vrPointers.get(e.pointerId);
+  const dx = e.clientX - prev[0], dy = e.clientY - prev[1];
+  vrPointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (vrPointers.size === 1) {
+    const k = (vr.fov * Math.PI / 180) / innerHeight * 1.7;
+    vr.yaw -= dx * k;
+    vr.pitch = THREE.MathUtils.clamp(vr.pitch - dy * k, -1.35, 1.35);
+  } else if (vrPointers.size === 2 && pinchDist) {
+    const pts = [...vrPointers.values()];
+    const d2 = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
+    setFov(vr.fov * pinchDist / d2);
+    pinchDist = d2;
+  }
+});
+addEventListener('pointerup', e => { vrPointers.delete(e.pointerId); pinchDist = 0; });
+renderer.domElement.addEventListener('wheel', e => {
+  if (!vr.on) return;
+  e.preventDefault();
+  setFov(vr.fov + e.deltaY * 0.03);
+}, { passive: false });
 renderer.domElement.addEventListener('click', e => {
   if (downXY && Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6) return;
+  if (vr.on) { vrClick(e); return; }
   const o = pickAt(e.clientX, e.clientY);
   if (!o) return;
   if (o.userData.pick === 'room') {
@@ -1021,6 +1079,113 @@ function togglePlan(v) {
 }
 
 /* ============================================================
+   VR 全景漫游（第一人称 720° 环视）
+   ============================================================ */
+const vr = { on: false, yaw: 0, pitch: -0.04, fov: 65 };
+let vrFly = null;
+
+function setFov(f) {
+  vr.fov = THREE.MathUtils.clamp(f, 28, 95);
+  perspCam.fov = vr.fov;
+  perspCam.updateProjectionMatrix();
+}
+function applyLook() {
+  perspCam.rotation.order = 'YXZ';
+  perspCam.rotation.set(vr.pitch, vr.yaw, 0);
+}
+function vrDefaultView() {
+  const F0 = activeFloor().data;
+  const r = F0.rooms.find(r => ['gt', 'gk', 'guoke'].includes(r.id)) || F0.rooms[0];
+  const [x1, y1, x2, y2] = r.bbox;
+  const e = r.enter || roomEnter(r);
+  return { pos: new THREE.Vector3(e.pos[0], F0.z + e.pos[1], e.pos[2]), yaw: vr.yaw, pitch: -0.04, room: r };
+}
+function enterVR() {
+  if (planMode) togglePlan(false);
+  vr.on = true;
+  controls.enabled = false;
+  setFov(65);
+  const v = vrDefaultView();
+  perspCam.position.copy(v.pos);
+  vr.yaw = v.yaw; vr.pitch = v.pitch;
+  applyLook();
+  activeFloor().hot.visible = true;
+  $('#vrChip').style.display = 'block';
+  syncUI();
+}
+function exitVR() {
+  vr.on = false;
+  vrFly = null;
+  controls.enabled = true;
+  activeFloor().hot.visible = false;
+  const cp = Math.cos(vr.pitch);
+  const fwd = new THREE.Vector3(-Math.sin(vr.yaw) * cp, Math.sin(vr.pitch), -Math.cos(vr.yaw) * cp);
+  controls.target.copy(perspCam.position).addScaledVector(fwd, 4);
+  controls.update();
+  $('#vrChip').style.display = 'none';
+  syncUI();
+}
+function toggleVR() { vr.on ? exitVR() : enterVR(); }
+
+function vrWalkTo(target) {
+  const from = perspCam.position.clone();
+  const dur = Math.min(1.2, 0.35 + from.distanceTo(target) * 0.12) * 1000;
+  vrFly = { t0: performance.now(), dur, p0: from, p1: target.clone() };
+}
+
+
+function buildHotspots(parent, F0, pickables) {
+  for (const w of F0.walls) {
+    const A = PX(...w.a);
+    const dir = new THREE.Vector3().subVectors(PX(...w.b), A);
+    const L = dir.length(); if (L < 0.1) continue;
+    dir.normalize();
+    const n = new THREE.Vector3(-dir.z, 0, dir.x);
+    for (const op of w.ops) {
+      if (!['door', 'pass', 'slide'].includes(op.type)) continue;
+      const c = A.clone().addScaledVector(dir, op.o);
+      const s = new THREE.Sprite(hotMat.clone());
+      s.scale.set(0.42, 0.42, 1);
+      s.position.set(c.x, 1.42, c.z);
+      s.userData = { pick: 'hotspot', base: c.clone(), normal: n.clone(),
+        name: '门口 · 点击穿越', desc: '点击此光环，视角将穿过门洞移动到另一侧空间。' };
+      parent.add(s);
+      pickables.push(s);
+    }
+  }
+}
+
+function vrClick(e) {
+  ptr.x = (e.clientX / innerWidth) * 2 - 1;
+  ptr.y = -(e.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(ptr, activeCam);
+  const hits = ray.intersectObjects(activeFloor().pickables.filter(p => p.visible), true);
+  let obj = null, point = null;
+  for (const h of hits) {
+    let o = h.object;
+    while (o && !o.userData.pick) o = o.parent;
+    if (o) { obj = o; point = h.point.clone(); break; }
+  }
+  if (!obj) return;
+  if (obj.userData.pick === 'hotspot') {
+    const side = Math.sign(new THREE.Vector3().subVectors(perspCam.position, obj.userData.base).dot(obj.userData.normal)) || 1;
+    const to = obj.userData.base.clone().addScaledVector(obj.userData.normal, -side * 0.55);
+    to.y = activeFloor().data.z + 1.6;
+    vrWalkTo(to);
+    return;
+  }
+  if (obj.userData.pick === 'room') {
+    const r = obj.userData.room;
+    const [x1, y1, x2, y2] = r.bbox;
+    const tx = THREE.MathUtils.clamp(point.x, x1 + 0.35, x2 - 0.35);
+    const tz = THREE.MathUtils.clamp(point.z, y1 + 0.35, y2 - 0.35);
+    vrWalkTo(new THREE.Vector3(tx, activeFloor().data.z + 1.6, tz));
+    return;
+  }
+  showInfo(obj.userData);
+}
+
+/* ============================================================
    UI
    ============================================================ */
 function syncUI() {
@@ -1031,6 +1196,9 @@ function syncUI() {
   $('#btnFurn').classList.toggle('on', activeFloor().furn.visible);
   $('#btnFurn').textContent = activeFloor().furn.visible ? '家具 · 显' : '家具 · 隐';
   $('#btnPlan').classList.toggle('on', planMode);
+  const bv = $('#btnVR');
+  bv.classList.toggle('on', vr.on);
+  bv.textContent = vr.on ? '退出 VR' : 'VR 漫游';
   document.querySelectorAll('.floor-btn').forEach(b =>
     b.classList.toggle('on', b.dataset.f === activeId));
   document.body.classList.toggle('is-night', night && mode === 'real');
@@ -1043,6 +1211,7 @@ $('#modeSeg').addEventListener('click', e => {
 $('#btnNight').onclick = () => setNight(!night);
 $('#btnFurn').onclick = () => { const f = activeFloor().furn; f.visible = !f.visible; syncUI(); };
 $('#btnPlan').onclick = () => togglePlan();
+$('#btnVR').onclick = () => toggleVR();
 $('#btnRooms').onclick = () => $('#sidebar').classList.toggle('open');
 $('#btnReset').onclick = resetView;
 
@@ -1097,14 +1266,35 @@ dispatchEvent(new Event('resize'));
 
 /* ---------- 主循环 ---------- */
 let booted = false;
+let hudTick = 0;
 function loop() {
   requestAnimationFrame(loop);
   tickFly();
-  controls.update();
+  if (vr.on) {
+    if (vrFly) {
+      const k = Math.min(1, (performance.now() - vrFly.t0) / vrFly.dur);
+      const e2 = 1 - Math.pow(1 - k, 3);
+      perspCam.position.lerpVectors(vrFly.p0, vrFly.p1, e2);
+      if (k >= 1) vrFly = null;
+    }
+    applyLook();
+    if (++hudTick % 12 === 0) {
+      const p = perspCam.position;
+      const rr = activeFloor().data.rooms.find(r =>
+        p.x >= r.bbox[0] && p.x <= r.bbox[2] && p.z >= r.bbox[1] && p.z <= r.bbox[3]);
+      const chipEl = document.getElementById('vrChip');
+      if (chipEl) chipEl.textContent = rr ? (rr.name + ' · ' + roomArea(rr).toFixed(1) + '㎡ ｜ 拖拽环视 · 点击地面行走 · 光环穿门') : '';
+    }
+    const hs = activeFloor().hot.children;
+    const pulse = 1 + 0.1 * Math.sin(performance.now() * 0.004);
+    for (const s of hs) s.scale.set(0.42 * pulse, 0.42 * pulse, 1);
+  } else {
+    controls.update();
+  }
   if (!planMode) {
     /* 动态 near：near ≈ 视距 1.5%，保证模型所在深度的精度恒定（缩放不再触发深度争抢） */
-    const d = perspCam.position.distanceTo(controls.target);
-    const nr = THREE.MathUtils.clamp(d * 0.015, 0.15, 2.5);
+    const dc = perspCam.position.distanceTo(controls.target);
+    const nr = THREE.MathUtils.clamp(dc * 0.015, 0.15, 2.5);
     if (Math.abs(perspCam.near - nr) > 0.005) {
       perspCam.near = nr; perspCam.far = nr + 260;
       perspCam.updateProjectionMatrix();
@@ -1128,7 +1318,15 @@ window.__snap = () => {
   renderer.render(scene, activeCam);
   return renderer.domElement.toDataURL('image/jpeg', 0.85);
 };
-window.__app = { setMode, setNight, togglePlan, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
+window.__app = { setMode, setNight, togglePlan, enterVR, exitVR, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
+window.__vr = {
+  look: (yaw, pitch) => { vr.yaw = yaw; vr.pitch = pitch; applyLook(); },
+  walk: (x, y, z2) => vrWalkTo(new THREE.Vector3(x, y, z2)),
+  walkV: v => vrWalkTo(v),
+  fov: setFov,
+  project: (x, y, z2) => { const v = new THREE.Vector3(x, y, z2).project(perspCam); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; },
+  V: (x, y, z2) => new THREE.Vector3(x, y, z2),
+};
 
 /* 缩放维度的频闪压力测试：逐档相机距离 × 多角度 × 5mm 抖动，
    返回 {距离: 最差机位的翻转像素占比%}，用于定位深度精度临界点。 */
