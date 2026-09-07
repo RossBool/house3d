@@ -102,6 +102,7 @@ const hotTexture = (() => {
   return t;
 })();
 const hotMat = new THREE.SpriteMaterial({ map: hotTexture, transparent: true, depthTest: true, opacity: 0.95 });
+const skirtMat = new THREE.MeshStandardMaterial({ color: 0x8a7a63, roughness: 0.7 });
 const exitSignMat = new THREE.MeshStandardMaterial({ color: 0x0b3d22, roughness: 0.5, emissive: 0x18e05a, emissiveIntensity: 0 });
 
 /* ---------- 家具类型名 ---------- */
@@ -159,6 +160,9 @@ function buildDoor(g, cx, op, t) {
   const hinge = new THREE.Group();
   hinge.position.set(cx - w / 2 + 0.05, 0, 0);
   addEdges(g, box(w - 0.1, h - 0.1, 0.045, leafMat, (w - 0.1) / 2, 0.05, 0, 0, hinge), 30);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8), MAT.black);
+  knob.position.set((w - 0.1) / 2 + 0.32, 1.05, 0.05);
+  hinge.add(knob);
   hinge.rotation.y = op.swing[1] > 0 ? -0.5 : 0.5;
   g.add(hinge);
 }
@@ -184,6 +188,7 @@ function buildWall(parent, w) {
   const L = dir.length();
   const ang = Math.atan2(dir.z, dir.x);
   const g = new THREE.Group();
+  g.name = 'wall:' + (w.name || '墙');
   g.position.copy(A);
   g.rotation.y = -ang;
   const t = w.t, H = w.h;
@@ -201,6 +206,9 @@ function buildWall(parent, w) {
   if (cursor < L - 0.001) segs.push({ from: cursor, to: L, y0: 0, y1: H });
   for (const s of segs) {
     addEdges(g, box(s.to - s.from, s.y1 - s.y0, t, wallMat, (s.from + s.to) / 2 - L / 2, s.y0, 0, 0, g));
+    if (s.y0 === 0 && !w.parapet) {
+      box(s.to - s.from, 0.08, t + 0.03, skirtMat, (s.from + s.to) / 2 - L / 2, 0, 0, 0, g, false);
+    }
   }
   for (const op of ops) {
     const cx = op.o - L / 2;
@@ -479,6 +487,43 @@ function buildColumns() {
 /* ============================================================
    逐层构建
    ============================================================ */
+/* 自动去穿插：家具与墙体 AABB 最小平移分离（迭代到脱离为止） */
+function decollideFloor(solid, furn, z) {
+  const wallBoxes = [];
+  solid.traverse(o => {
+    if (o.isMesh && o.parent.name && o.parent.name.startsWith('wall:')) {
+      wallBoxes.push(new THREE.Box3().setFromObject(o).expandByScalar(-0.015));
+    }
+  });
+  for (let pass = 0; pass < 4; pass++) {
+    let moved = 0;
+    for (const g of furn.children) {
+      if (!g.userData.pick) continue;
+      for (let iter = 0; iter < 4; iter++) {
+        const b = new THREE.Box3().setFromObject(g);
+        let pen = 1e9, axis = 'x', sgn = 1;
+        for (const wb of wallBoxes) {
+          if (!b.intersectsBox(wb)) continue;
+          const ox = Math.min(b.max.x, wb.max.x) - Math.max(b.min.x, wb.min.x);
+          const oy = Math.min(b.max.y, wb.max.y) - Math.max(b.min.y, wb.min.y);
+          const oz = Math.min(b.max.z, wb.max.z) - Math.max(b.min.z, wb.min.z);
+          const m = Math.min(ox, oy, oz);
+          if (m < pen) {
+            pen = m;
+            if (m === ox) { axis = 'x'; sgn = (b.min.x + b.max.x) / 2 < (wb.min.x + wb.max.x) / 2 ? -1 : 1; }
+            else if (m === oy) { axis = 'y'; sgn = (b.min.y + b.max.y) / 2 < (wb.min.y + wb.max.y) / 2 ? -1 : 1; }
+            else { axis = 'z'; sgn = (b.min.z + b.max.z) / 2 < (wb.min.z + wb.max.z) / 2 ? -1 : 1; }
+          }
+        }
+        if (pen > 0.6) break;
+        g.position[axis] += sgn * (pen + 0.006);
+        moved++;
+      }
+    }
+    if (!moved) break;
+  }
+}
+
 FLOORS.forEach(F0 => {
   const group = new THREE.Group();
   group.position.y = F0.z;
@@ -546,6 +591,8 @@ FLOORS.forEach(F0 => {
   });
 
   buildHotspots(hot, F0, pickables);
+  decollideFloor(solid, furn);
+
   floorObjs[F0.id] = { group, solid, edge, furn, hot, lights, pickables, data: F0 };
 });
 
@@ -1313,12 +1360,46 @@ switchFloor('f9');
 syncUI();
 loop();
 
-/* 调试/无头截图钩子 */
+/* 穿插审计（逐 mesh 精确版）：家具 mesh × 墙 mesh、家具 mesh × 家具 mesh 的真实穿插 */
+window.__audit = () => {
+  const out = [];
+  const shrink = (b, s = 0.012) => { const c = b.clone(); c.min.addScalar(s); c.max.addScalar(-s); return c; };
+  for (const id in floorObjs) {
+    const wm = [], fm = [];
+    floorObjs[id].solid.traverse(o => {
+      if (!o.isMesh) return;
+      if (o.parent.name && o.parent.name.startsWith('wall:')) wm.push({ n: o.parent.name, b: shrink(new THREE.Box3().setFromObject(o)) });
+    });
+    floorObjs[id].furn.traverse(o => {
+      if (!o.isMesh) return;
+      let g = o, nm = '';
+      while (g && !g.userData.name) g = g.parent;
+      if (g) nm = g.userData.name;
+      fm.push({ n: nm, b: shrink(new THREE.Box3().setFromObject(o)) });
+    });
+    const hit = (a, b) => a.min.x < b.max.x && a.max.x > b.min.x && a.min.y < b.max.y && a.max.y > b.min.y && a.min.z < b.max.z && a.max.z > b.min.z;
+    for (const f of fm) for (const w of wm) {
+      if (hit(f.b, w.b)) { out.push(`[${id}] 「${f.n}」× 墙「${w.n}」 mesh@(${f.b.min.x.toFixed(2)},${f.b.min.z.toFixed(2)})`); break; }
+    }
+    for (let i = 0; i < fm.length; i++) for (let j = i + 1; j < fm.length; j++) {
+      if (fm[i].n === fm[j].n) continue;
+      if (hit(fm[i].b, fm[j].b)) { out.push(`[${id}] 「${fm[i].n}」× 「${fm[j].n}」`); break; }
+    }
+  }
+  return out.length ? out : ['全部干净 ✓'];
+};
+
+/* 调试/无头截图钩子 *//* 调试/无头截图钩子 */
 window.__snap = () => {
   renderer.render(scene, activeCam);
   return renderer.domElement.toDataURL('image/jpeg', 0.85);
 };
 window.__app = { setMode, setNight, togglePlan, enterVR, exitVR, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
+/* 全楼层最终去穿插（在所有组装完成后统一执行） */
+for (const id in floorObjs) decollideFloor(floorObjs[id].solid, floorObjs[id].furn);
+window.__auditHelper = { Box3: THREE.Box3, V3: THREE.Vector3 };
+window.__app.floorObjs = floorObjs;
+window.__app.decollideFloor = decollideFloor;
 window.__vr = {
   look: (yaw, pitch) => { vr.yaw = yaw; vr.pitch = pitch; applyLook(); },
   walk: (x, y, z2) => vrWalkTo(new THREE.Vector3(x, y, z2)),
