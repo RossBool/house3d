@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周湍淇住宅楼 · 九层平面（26.900）互动模型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4efe4; --paper2:#ede7d8; --ink:#26221a; --ink2:#5c5648;
+    --accent:#b5442d; --blue:#46608c; --line:rgba(38,34,26,.16);
+    --panel:rgba(250,247,240,.94);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:"Noto Serif SC","Songti SC","STSong",serif;color:var(--ink);
+    background:var(--paper);
+  }
+  #stage{position:fixed;inset:0}
+  #stage canvas{display:block}
+  #planCanvas{position:fixed;inset:0;pointer-events:none;display:none;z-index:5}
+
+  /* ---- 楼层切换器（右侧竖排）---- */
+  #floorStrip{
+    position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:20;
+    display:flex;flex-direction:column;gap:4px;background:var(--panel);
+    border:1px solid var(--line);border-radius:4px;padding:6px;
+    box-shadow:0 10px 30px rgba(30,25,15,.14);backdrop-filter:blur(8px);
+  }
+  .floor-btn{
+    border:1px solid transparent;background:transparent;cursor:pointer;border-radius:3px;
+    font-family:inherit;color:var(--ink2);padding:4px 8px;min-width:52px;text-align:center;
+    transition:all .15s;
+  }
+  .floor-btn span{display:block;font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600}
+  .floor-btn i{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--ink2)}
+  .floor-btn:hover{background:rgba(181,68,45,.08)}
+  .floor-btn.on{background:var(--ink);color:#f4efe4}
+  .floor-btn.on i{color:#d9c9a8}
+
+  /* ---- 悬停提示 ---- */
+  #hoverChip{
+    position:fixed;display:none;z-index:30;pointer-events:none;
+    background:var(--ink);color:#f4efe4;font-size:13px;letter-spacing:.08em;
+    padding:5px 12px;border-radius:2px;font-family:"Noto Serif SC",serif;
+    box-shadow:0 4px 14px rgba(0,0,0,.25);
+  }
+
+  /* ---- 品牌图签（左上）---- */
+  #brand{
+    position:fixed;top:18px;left:20px;z-index:20;pointer-events:none;
+    display:flex;gap:14px;align-items:stretch;
+  }
+  #brand .seal{
+    width:54px;height:54px;background:var(--accent);color:#f7f2e6;border-radius:3px;
+    display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;
+    letter-spacing:2px;box-shadow:0 6px 16px rgba(181,68,45,.35);writing-mode:vertical-rl;
+  }
+  #brand .meta h1{font-size:19px;font-weight:900;letter-spacing:.06em}
+  #brand .meta p{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink2);margin-top:4px;letter-spacing:.05em}
+  #brand .meta em{font-style:normal;color:var(--accent)}
+
+  /* ---- 工具条（顶部居中）---- */
+  #toolbar{
+    position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:20;
+    display:flex;gap:8px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:4px;padding:7px 10px;
+    box-shadow:0 10px 30px rgba(30,25,15,.14);backdrop-filter:blur(8px);
+  }
+  .seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .seg button{
+    border:none;background:transparent;color:var(--ink2);cursor:pointer;
+    font-family:inherit;font-size:13px;padding:6px 13px;letter-spacing:.06em;
+    border-right:1px solid var(--line);transition:all .18s;
+  }
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--ink);color:#f4efe4}
+  .seg button:not(.on):hover{background:rgba(38,34,26,.07)}
+  .tbtn{
+    border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;
+    font-family:inherit;font-size:13px;padding:6px 13px;border-radius:3px;letter-spacing:.06em;
+    transition:all .18s;
+  }
+  .tbtn:hover{background:rgba(38,34,26,.07)}
+  .tbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .vline{width:1px;height:22px;background:var(--line)}
+
+  /* ---- 侧栏（左下房间索引）---- */
+  #sidebar{
+    position:fixed;left:20px;top:96px;bottom:20px;width:212px;z-index:15;
+    display:flex;flex-direction:column;gap:10px;pointer-events:none;
+  }
+  .panel{
+    pointer-events:auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:4px;box-shadow:0 10px 30px rgba(30,25,15,.12);backdrop-filter:blur(8px);
+  }
+  #bInfo{padding:13px 15px}
+  #bInfo h3{font-size:13px;letter-spacing:.2em;color:var(--accent);margin-bottom:8px}
+  #bInfo p{font-size:12.5px;line-height:1.75;color:var(--ink2)}
+  #roomList{padding:8px;overflow-y:auto;flex:1;min-height:0}
+  #roomList::-webkit-scrollbar{width:4px}
+  #roomList::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+  .room-item{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:8px 10px;border-radius:3px;cursor:pointer;transition:all .15s;
+    border-bottom:1px dashed var(--line);
+  }
+  .room-item:last-child{border-bottom:none}
+  .room-item:hover{background:rgba(181,68,45,.08)}
+  .room-item:hover .room-name{color:var(--accent)}
+  .room-name{font-size:14px;letter-spacing:.1em}
+  .room-area{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink2)}
+
+  /* ---- 信息面板（右侧）---- */
+  #infoPanel{
+    position:fixed;right:20px;top:96px;width:330px;max-height:calc(100% - 130px);z-index:20;
+    padding:20px 22px;overflow-y:auto;
+    transform:translateX(24px);opacity:0;pointer-events:none;
+    transition:all .35s cubic-bezier(.2,.8,.2,1);
+  }
+  #infoPanel.open{transform:none;opacity:1;pointer-events:auto}
+  #infoPanel::-webkit-scrollbar{width:4px}
+  #infoPanel::-webkit-scrollbar-thumb{background:var(--line)}
+  .info-tag{
+    display:inline-block;font-size:11px;letter-spacing:.3em;color:var(--accent);
+    border:1px solid rgba(181,68,45,.45);padding:3px 9px 3px 12px;border-radius:2px;margin-bottom:10px;
+  }
+  #infoPanel h2{font-size:26px;font-weight:900;letter-spacing:.12em;margin-bottom:14px}
+  .info-grid{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+  .info-grid div{
+    display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px dashed var(--line);
+  }
+  .info-grid i{font-style:normal;font-size:11.5px;color:var(--ink2);white-space:nowrap;letter-spacing:.1em}
+  .info-grid b{font-family:"IBM Plex Mono","Noto Serif SC",monospace;font-size:12px;font-weight:500;line-height:1.6}
+  .info-desc{font-size:13.5px;line-height:2;color:var(--ink);text-align:justify}
+  .info-actions{display:flex;gap:8px;margin-top:16px}
+  .btn{
+    flex:1;border:1px solid var(--ink);background:transparent;color:var(--ink);
+    font-family:inherit;font-size:13px;letter-spacing:.12em;padding:9px 0;border-radius:3px;
+    cursor:pointer;transition:all .18s;
+  }
+  .btn:hover{background:rgba(38,34,26,.08)}
+  .btn.primary{background:var(--ink);color:#f4efe4}
+  .btn.primary:hover{background:var(--accent);border-color:var(--accent)}
+
+  /* ---- 底部提示 ---- */
+  #hint{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:15;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink2);
+    letter-spacing:.08em;background:var(--panel);border:1px solid var(--line);
+    border-radius:3px;padding:6px 16px;pointer-events:none;
+  }
+  #hint b{color:var(--accent);font-weight:600}
+
+  /* ---- 夜间模式下 UI 微调 ---- */
+  body.is-night #brand .meta h1{color:#e8e2d2}
+  body.is-night #hint,body.is-night #bInfo p{color:#b7b0a0}
+
+  @media (max-width:900px){
+    #sidebar{display:none}
+    #infoPanel{width:min(330px,calc(100vw - 40px))}
+    #toolbar{flex-wrap:wrap;justify-content:center;max-width:92vw;top:auto;bottom:64px}
+    #hint{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<canvas id="planCanvas"></canvas>
+<div id="hoverChip"></div>
+
+<div id="brand">
+  <div class="seal">宅</div>
+  <div class="meta">
+    <h1>周湍淇住宅楼 · 全楼层</h1>
+    <p>负一层 — 屋面层 · 建施 2025-11 · <em>总高 31.25m</em></p>
+  </div>
+</div>
+
+<div id="toolbar">
+  <div class="seg" id="modeSeg">
+    <button data-m="real" class="on">真实材质</button>
+    <button data-m="white">白模</button>
+    <button data-m="wire">线框</button>
+  </div>
+  <div class="vline"></div>
+  <button class="tbtn" id="btnNight">☀️ 白天</button>
+  <button class="tbtn on" id="btnFurn">家具 · 显</button>
+  <div class="vline"></div>
+  <button class="tbtn" id="btnPlan">平面图</button>
+  <button class="tbtn" id="btnReset">总览</button>
+</div>
+
+<div id="sidebar">
+  <div class="panel" id="bInfo">
+    <h3>建 筑 概 况</h3>
+    <p id="introText"></p>
+  </div>
+  <div class="panel" id="roomList"></div>
+</div>
+
+<div class="panel" id="infoPanel"></div>
+
+<div id="floorStrip"></div>
+
+<div id="hint">左键拖拽旋转 · 滚轮缩放 · <b>点击房间/家具</b>查看讲解 · <b>右侧切换楼层</b> · 快捷键 <b>1/2/3</b> 材质 <b>N</b> 昼夜 <b>F</b> 家具 <b>P</b> 平面图 <b>R</b> 复位</div>
+
+<script src="./data.js"></script>
+<script type="importmap">{ "imports": { "three": "./libs/three.module.js" } }</script>
+<script type="module" src="./app.js"></script>
+<script>
+  window.__errs = [];
+  window.addEventListener('error', e => window.__errs.push(e.message + ' @' + (e.filename||'') + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', e => window.__errs.push('rejection: ' + String(e.reason)));
+  document.getElementById('introText').textContent = META.intro;
+</script>
+</body>
+</html>
