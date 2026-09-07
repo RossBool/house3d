@@ -101,7 +101,8 @@ const hotTexture = (() => {
   const t = new THREE.CanvasTexture(c);
   return t;
 })();
-const hotMat = new THREE.SpriteMaterial({ map: hotTexture, transparent: true, depthTest: true, opacity: 0.95 });
+const hotPlaneGeo = new THREE.PlaneGeometry(0.52, 0.52);
+const hotPlaneMat = () => new THREE.MeshBasicMaterial({ map: hotTexture, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
 const skirtMat = new THREE.MeshStandardMaterial({ color: 0x8a7a63, roughness: 0.7 });
 const exitSignMat = new THREE.MeshStandardMaterial({ color: 0x0b3d22, roughness: 0.5, emissive: 0x18e05a, emissiveIntensity: 0 });
 
@@ -1155,6 +1156,15 @@ function enterVR() {
   const v = vrDefaultView();
   perspCam.position.copy(v.pos);
   vr.yaw = v.yaw; vr.pitch = v.pitch;
+  /* 面向最近的门洞光环，保证一进来就看到可行方向 */
+  let bd = 1e9, bt = null;
+  for (const p of activeFloor().pickables) {
+    if (p.userData.pick !== 'hotspot') continue;
+    const d = (p.position.x - perspCam.position.x) ** 2 + (p.position.z - perspCam.position.z) ** 2;
+    if (d < bd) { bd = d; bt = p.position; }
+  }
+  if (bt) vr.yaw = Math.atan2(-(bt.x - perspCam.position.x), -(bt.z - perspCam.position.z));
+  vr.pitch = -0.05;
   applyLook();
   activeFloor().hot.visible = true;
   $('#vrChip').style.display = 'block';
@@ -1191,13 +1201,16 @@ function buildHotspots(parent, F0, pickables) {
     for (const op of w.ops) {
       if (!['door', 'pass', 'slide'].includes(op.type)) continue;
       const c = A.clone().addScaledVector(dir, op.o);
-      const s = new THREE.Sprite(hotMat.clone());
-      s.scale.set(0.42, 0.42, 1);
-      s.position.set(c.x, 1.42, c.z);
-      s.userData = { pick: 'hotspot', base: c.clone(), normal: n.clone(),
-        name: '门口 · 点击穿越', desc: '点击此光环，视角将穿过门洞移动到另一侧空间。' };
-      parent.add(s);
-      pickables.push(s);
+      for (const side of [1, -1]) {
+        const s = new THREE.Mesh(hotPlaneGeo, hotPlaneMat());
+        s.rotation.x = -Math.PI / 2;
+        s.position.set(c.x + n.x * side * 0.55, 0.06, c.z + n.z * side * 0.55);
+        s.renderOrder = 5;
+        s.userData = { pick: 'hotspot', floorId: F0.id, doorC: [c.x, c.z], n: [n.x, n.z],
+          name: '门口 · 点击穿越', desc: '点击此光环，将穿过门洞移动到另一侧空间。' };
+        parent.add(s);
+        pickables.push(s);
+      }
     }
   }
 }
@@ -1215,10 +1228,10 @@ function vrClick(e) {
   }
   if (!obj) return;
   if (obj.userData.pick === 'hotspot') {
-    const side = Math.sign(new THREE.Vector3().subVectors(perspCam.position, obj.userData.base).dot(obj.userData.normal)) || 1;
-    const to = obj.userData.base.clone().addScaledVector(obj.userData.normal, -side * 0.55);
-    to.y = activeFloor().data.z + 1.6;
-    vrWalkTo(to);
+    const [cx, cz] = obj.userData.doorC;
+    const [nx, nz] = obj.userData.n;
+    const side = Math.sign((perspCam.position.x - cx) * nx + (perspCam.position.z - cz) * nz) || 1;
+    vrWalkTo(new THREE.Vector3(cx - nx * side * 0.6, activeFloor().data.z + 1.6, cz - nz * side * 0.6));
     return;
   }
   if (obj.userData.pick === 'room') {
