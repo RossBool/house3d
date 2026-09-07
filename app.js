@@ -20,7 +20,7 @@ document.getElementById('stage').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 
-const perspCam = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 400);
+const perspCam = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.25, 260);
 perspCam.position.set(21, 17, 30);
 
 const orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
@@ -44,7 +44,7 @@ const sun = new THREE.DirectionalLight(0xfff2dd, 3.0);
 sun.position.set(26, 32, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048);
-sun.shadow.normalBias = 0.02;
+sun.shadow.normalBias = 0.03;
 sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
 sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
 sun.shadow.camera.far = 100;
@@ -479,12 +479,19 @@ FLOORS.forEach(F0 => {
   walls.forEach(w => buildWall(solid, w));
 
   /* 楼板 */
-  let slabIdx = 0;
+  const placed = [];
   F0.rooms.forEach(r => {
     const [x1, y1, x2, y2] = r.bbox;
     const fm = FLOOR_MATS[r.floor];
     const m = new THREE.Mesh(new THREE.BoxGeometry(x2 - x1, 0.14, y2 - y1), std(fm.color, fm.rough));
-    m.position.set((x1 + x2) / 2, -0.07 - (slabIdx++) * 0.001, (y1 + y2) / 2);
+    let drop = 0;
+    for (const p of placed) {
+      const ox = Math.min(x2, p[2]) - Math.max(x1, p[0]);
+      const oz = Math.min(y2, p[3]) - Math.max(y1, p[1]);
+      if (ox > 0.01 && oz > 0.01) drop += 0.006;
+    }
+    placed.push([x1, y1, x2, y2]);
+    m.position.set((x1 + x2) / 2, -0.07 - drop, (y1 + y2) / 2);
     m.receiveShadow = true;
     m.userData = { pick: 'room', room: r, floorId: F0.id };
     solid.add(m);
@@ -503,7 +510,7 @@ FLOORS.forEach(F0 => {
   if (F0.core) { buildStairs(solid); buildElevator(solid); }
   if (F0.id === 'fb1') buildB1Stairs(solid);
   if (F0.roof) {
-    box(10.4, 0.15, 19.7, MAT.slab, 5.3, -0.15, 9.95, 0, solid, false);
+    box(10.4, 0.15, 19.7, MAT.slab, 5.3, -0.20, 9.95, 0, solid, false);
     box(0.7, 0.3, 0.7, MAT.extWall, 9.6, 0, 0.9, 0, solid, false); // 检修孔
   }
 
@@ -1108,3 +1115,74 @@ window.__snap = () => {
   return renderer.domElement.toDataURL('image/jpeg', 0.85);
 };
 window.__app = { setMode, setNight, togglePlan, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
+
+/* 频闪压力测试：36 个环视机位，每个机位向目标推进 3cm 渲两帧。
+   3cm 在数十米距离上视差 <0.5px，正常表面像素应当不变；
+   z-fighting 表面会整片翻转。返回每个机位的“变化像素占比%”。 */
+window.__zflick = (n = 36, jitter = 0.005) => {
+  const W = 320, H = 200;
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const octx = out.getContext('2d', { willReadFrequently: true });
+  const ratios = [], masks = [];
+  const z = activeFloor().data.z;
+  const camSave = perspCam.position.clone(), tgtSave = controls.target.clone();
+  let worstPoses = [];
+  for (let k = 0; k < n; k++) {
+    const th = k / n * Math.PI * 2;
+    const h = z + 10 + 14 * Math.abs(Math.sin(k * 1.7));
+    const pos = new THREE.Vector3(5.3 + Math.cos(th) * 28, h, 9.5 + Math.sin(th) * 28);
+    const tgt = new THREE.Vector3(5.3, z + 0.5, 9.5);
+    const grab = () => {
+      perspCam.position.copy(pos);
+      controls.target.copy(tgt);
+      perspCam.lookAt(tgt);
+      renderer.render(scene, perspCam);
+      octx.drawImage(renderer.domElement, 0, 0, W, H);
+      return octx.getImageData(0, 0, W, H).data;
+    };
+    const f1 = grab();
+    const toward = new THREE.Vector3().subVectors(tgt, pos).normalize().multiplyScalar(jitter);
+    perspCam.position.add(toward);
+    perspCam.lookAt(tgt);
+    renderer.render(scene, perspCam);
+    octx.drawImage(renderer.domElement, 0, 0, W, H);
+    const f2 = octx.getImageData(0, 0, W, H).data;
+    /* 差异掩膜：通道差>25 记为翻转像素 */
+    const mask = new Uint8Array(W * H);
+    let diff = 0;
+    for (let i = 0, p = 0; i < f1.length; i += 4, p++) {
+      const d = Math.abs(f1[i] - f2[i]) + Math.abs(f1[i+1] - f2[i+1]) + Math.abs(f1[i+2] - f2[i+2]);
+      if (d > 45) { mask[p] = 1; diff++; }
+    }
+    /* 腐蚀一次：只保留大块内部的翻转像素（剔除 1px 视差边缘噪声） */
+    const inner = new Uint8Array(W * H);
+    let innerCnt = 0;
+    for (let yy = 1; yy < H - 1; yy++) for (let xx = 1; xx < W - 1; xx++) {
+      const p = yy * W + xx;
+      if (mask[p] && mask[p-1] && mask[p+1] && mask[p-W] && mask[p+W]) { inner[p] = 1; innerCnt++; }
+    }
+    ratios.push(Math.round(innerCnt / (W * H) * 10000) / 100);
+    if (innerCnt > 30) {
+      const m = new Uint8ClampedArray(W * H * 4);
+      for (let p = 0; p < W * H; p++) {
+        const v = inner[p] ? 255 : (mask[p] ? 90 : 30);
+        m[p*4] = inner[p] ? 255 : v; m[p*4+1] = mask[p] ? 60 : 28; m[p*4+2] = 28; m[p*4+3] = 255;
+      }
+      masks.push({ pose: k, png: null, data: m, W, H });
+      worstPoses.push(k);
+    }
+  }
+  perspCam.position.copy(camSave);
+  controls.target.copy(tgtSave);
+  /* 最差机位掩膜转 dataURL */
+  let worstMask = null;
+  if (masks.length) {
+    masks.sort((a, b) => b.data.length && 0);
+    const mk = masks[masks.length - 1];
+    const c = document.createElement('canvas'); c.width = mk.W; c.height = mk.H;
+    c.getContext('2d').putImageData(new ImageData(mk.data, mk.W, mk.H), 0, 0);
+    worstMask = c.toDataURL('image/png');
+  }
+  return { ratios, worstMask, worstPoses };
+};
