@@ -794,8 +794,14 @@ renderer.domElement.addEventListener('wheel', e => {
   setFov(vr.fov + e.deltaY * 0.03);
 }, { passive: false });
 renderer.domElement.addEventListener('click', e => {
+  window.__clickCount = (window.__clickCount || 0) + 1;
   if (downXY && Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6) return;
-  if (vr.on) { vrClick(e); return; }
+  if (vr.on) {
+    window.__diag = { client: [e.clientX, e.clientY], vrOn: vr.on };
+    vrClick(e);
+    window.__diag.done = true;
+    return;
+  }
   const o = pickAt(e.clientX, e.clientY);
   if (!o) return;
   if (o.userData.pick === 'room') {
@@ -1220,29 +1226,40 @@ function vrClick(e) {
   ptr.y = -(e.clientY / innerHeight) * 2 + 1;
   ray.setFromCamera(ptr, activeCam);
   const hits = ray.intersectObjects(activeFloor().pickables.filter(p => p.visible), true);
-  let obj = null, point = null;
+  /* 光环（穿越门洞）拥有最高优先级：只要射线扫到就穿越 */
+  let hotspot = null, hotspotPt = null, roomHit = null, roomPt = null, furnHit = null, furnPt = null;
   for (const h of hits) {
     let o = h.object;
     while (o && !o.userData.pick) o = o.parent;
-    if (o) { obj = o; point = h.point.clone(); break; }
+    if (!o) continue;
+    const k = o.userData.pick;
+    if (k === 'hotspot') { if (!hotspot) hotspot = o; }
+    else if (k === 'room') { if (!roomHit) roomHit = { o, pt: h.point.clone() }; }
+    else if (!furnHit) furnHit = { o, pt: h.point.clone() };
+    if (hotspot && roomHit && furnHit) break;
   }
-  if (!obj) return;
-  if (obj.userData.pick === 'hotspot') {
-    const [cx, cz] = obj.userData.doorC;
-    const [nx, nz] = obj.userData.n;
+  if (hotspot) {
+    const [cx, cz] = hotspot.userData.doorC;
+    const [nx, nz] = hotspot.userData.n;
     const side = Math.sign((perspCam.position.x - cx) * nx + (perspCam.position.z - cz) * nz) || 1;
-    vrWalkTo(new THREE.Vector3(cx - nx * side * 0.6, activeFloor().data.z + 1.6, cz - nz * side * 0.6));
+    vrWalkTo(new THREE.Vector3(cx - nx * side * 1.1, activeFloor().data.z + 1.6, cz - nz * side * 1.1));
     return;
   }
-  if (obj.userData.pick === 'room') {
-    const r = obj.userData.room;
-    const [x1, y1, x2, y2] = r.bbox;
-    const tx = THREE.MathUtils.clamp(point.x, x1 + 0.35, x2 - 0.35);
-    const tz = THREE.MathUtils.clamp(point.z, y1 + 0.35, y2 - 0.35);
+  if (roomHit) {
+    const r = roomHit.o.userData.room;
+    const [bx1, by1, bx2, by2] = r.bbox;
+    const tx = THREE.MathUtils.clamp(roomHit.pt.x, bx1 + 0.3, bx2 - 0.3);
+    const tz = THREE.MathUtils.clamp(roomHit.pt.z, by1 + 0.3, by2 - 0.3);
     vrWalkTo(new THREE.Vector3(tx, activeFloor().data.z + 1.6, tz));
+    hlBox.box.setFromPoints([PX(bx1, by1).setY(activeFloor().data.z), PX(bx2, by2).setY(activeFloor().data.z + 1.2)]);
+    hlBox.visible = true;
+    showInfo({ pick: 'room', room: r });
     return;
   }
-  showInfo(obj.userData);
+  if (furnHit) {
+    showInfo(furnHit.o.userData);
+    hlBox.box.setFromObject(furnHit.o); hlBox.visible = true;
+  }
 }
 
 /* ============================================================
@@ -1373,6 +1390,38 @@ switchFloor('f9');
 syncUI();
 loop();
 
+/* VR 点击压测：视口网格采样射线，统计可直接点中的门洞穿越光环 */
+window.__zclick = () => {
+  const hitsList = [];
+  for (let gx = 0.1; gx <= 0.9; gx += 0.08) {
+    for (let gy = 0.25; gy <= 0.85; gy += 0.08) {
+      ptr.set(gx * 2 - 1, -(gy * 2 - 1));
+      ray.setFromCamera(ptr, activeCam);
+      const hits = ray.intersectObjects(activeFloor().pickables.filter(p => p.visible), true);
+      for (const h of hits) {
+        let o = h.object;
+        while (o && !o.userData.pick) o = o.parent;
+        if (o && o.userData.pick === 'hotspot') { hitsList.push({ gx: +gx.toFixed(2), gy: +gy.toFixed(2), name: o.userData.name }); break; }
+      }
+    }
+  }
+  return { clickable: hitsList.length, samples: hitsList.slice(0, 6) };
+};
+
+/* 点击链路诊断：给定 NDC 坐标，返回射线命中的对象类型序列 */
+window.__probeRay = (nx, ny) => {
+  ptr.set(nx, ny);
+  ray.setFromCamera(ptr, activeCam);
+  const hits = ray.intersectObjects(activeFloor().pickables.filter(p => p.visible), true);
+  const seq = [];
+  for (const h of hits.slice(0, 8)) {
+    let o = h.object;
+    while (o && !o.userData.pick) o = o.parent;
+    seq.push(o ? o.userData.pick : '?');
+  }
+  return seq.join(' > ') || 'none';
+};
+
 /* 穿插审计（逐 mesh 精确版）：家具 mesh × 墙 mesh、家具 mesh × 家具 mesh 的真实穿插 */
 window.__audit = () => {
   const out = [];
@@ -1406,6 +1455,16 @@ window.__audit = () => {
 window.__snap = () => {
   renderer.render(scene, activeCam);
   return renderer.domElement.toDataURL('image/jpeg', 0.85);
+};
+window.__step = (n = 1) => {
+  for (let i = 0; i < n; i++) {
+    tickFly();
+    controls.update();
+    if (vr.on) applyLook();
+    renderer.render(scene, activeCam);
+    if (planMode) drawPlan();
+  }
+  return n;
 };
 window.__app = { setMode, setNight, togglePlan, enterVR, exitVR, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
 /* 全楼层最终去穿插（在所有组装完成后统一执行） */
