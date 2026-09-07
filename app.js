@@ -1429,6 +1429,41 @@ window.__probeRay = (nx, ny) => {
   return seq.join(' > ') || 'none';
 };
 
+/* 开洞-隔墙相交检查：门窗/洞口横跨内隔墙 = 定位错误 */
+window.__openCheck = () => {
+  const out = [];
+  FLOORS.forEach(F0 => {
+    const walls = F0.walls;
+    for (const w of walls) {
+      const A = [w.a[0], w.a[1]];
+      const du = [w.b[0] - w.a[0], w.b[1] - w.a[1]];
+      const L = Math.hypot(du[0], du[1]); if (L < 0.05) continue;
+      const u = [du[0] / L, du[1] / L];
+      for (const v of walls) {
+        if (v === w) continue;
+        const dv = [v.b[0] - v.a[0], v.b[1] - v.a[1]];
+        const Lv = Math.hypot(dv[0], dv[1]); if (Lv < 0.05) continue;
+        const uu = [dv[0] / Lv, dv[1] / Lv];
+        const den = u[0] * (-uu[1]) - u[1] * (-uu[0]);
+        if (Math.abs(den) < 1e-9) continue;
+        const q = [v.a[0] - A[0], v.a[1] - A[1]];
+        const s = (q[0] * (-uu[1]) - q[1] * (-uu[0])) / den;
+        const t2 = (q[0] * u[1] - q[1] * u[0]) / den;
+        if (t2 < -0.01 || t2 > Lv + 0.01) continue;
+        if (s < -0.05 || s > L + 0.05) continue;
+        for (const op of v.ops) {
+          if (!['win', 'door', 'slide', 'pass', 'lift'].includes(op.type)) continue;
+          const o1 = op.o - op.w / 2, o2 = op.o + op.w / 2;
+          if (s > o1 - 0.02 && s < o2 + 0.02) {
+            out.push(`[${F0.id}] 「${v.name}」的 ${op.code} 开洞(${o1.toFixed(2)}–${o2.toFixed(2)})被「${w.name}」在 s=${s.toFixed(2)} 处截断`);
+          }
+        }
+      }
+    }
+  });
+  return out.length ? out : ['门窗开洞均未跨墙 ✓'];
+};
+
 /* 穿插审计（逐 mesh 精确版）：家具 mesh × 墙 mesh、家具 mesh × 家具 mesh 的真实穿插 */
 window.__audit = () => {
   const out = [];
