@@ -9,7 +9,7 @@ const PX = (x, y) => new THREE.Vector3(x, 0, y);
 const $ = s => document.querySelector(s);
 
 /* ---------- 渲染器 / 场景 ---------- */
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches || innerWidth < 860;
 renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.6 : 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -538,9 +538,9 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.set(5.3, -0.6, 9.95);
 ground.receiveShadow = true;
 scene.add(ground);
-const grid = new THREE.GridHelper(120, 60, 0xb4ac96, 0xbfb8a4);
+const grid = new THREE.GridHelper(120, 30, 0xb4ac96, 0xbfb8a4);
 grid.position.set(5.3, -0.58, 9.95);
-grid.material.opacity = 0.35; grid.material.transparent = true;
+grid.material.opacity = 0.22; grid.material.transparent = true;
 scene.add(grid);
 
 /* ============================================================
@@ -1096,6 +1096,15 @@ function loop() {
   requestAnimationFrame(loop);
   tickFly();
   controls.update();
+  if (!planMode) {
+    /* 动态 near：near ≈ 视距 1.5%，保证模型所在深度的精度恒定（缩放不再触发深度争抢） */
+    const d = perspCam.position.distanceTo(controls.target);
+    const nr = THREE.MathUtils.clamp(d * 0.015, 0.15, 2.5);
+    if (Math.abs(perspCam.near - nr) > 0.005) {
+      perspCam.near = nr; perspCam.far = nr + 260;
+      perspCam.updateProjectionMatrix();
+    }
+  }
   renderer.render(scene, activeCam);
   if (planMode) drawPlan();
   if (!booted) {
@@ -1115,6 +1124,56 @@ window.__snap = () => {
   return renderer.domElement.toDataURL('image/jpeg', 0.85);
 };
 window.__app = { setMode, setNight, togglePlan, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
+
+/* 缩放维度的频闪压力测试：逐档相机距离 × 多角度 × 5mm 抖动，
+   返回 {距离: 最差机位的翻转像素占比%}，用于定位深度精度临界点。 */
+window.__zstress = (distances = [6, 12, 20, 30, 45, 65, 90, 120], angles = 12, jitter = 0.005) => {
+  const W = 320, H = 200;
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const octx = out.getContext('2d', { willReadFrequently: true });
+  const z = activeFloor().data.z;
+  const camSave = perspCam.position.clone(), tgtSave = controls.target.clone();
+  const result = {};
+  for (const D of distances) {
+    let worst = 0;
+    for (let k = 0; k < angles; k++) {
+      const th = k / angles * Math.PI * 2;
+      const pos = new THREE.Vector3(5.3 + Math.cos(th) * D * 0.8, z + 5 + D * 0.45, 9.5 + Math.sin(th) * D * 0.8);
+      const tgt = new THREE.Vector3(5.3, z + 0.5, 9.5);
+      const grab = () => {
+        perspCam.position.copy(pos);
+        controls.target.copy(tgt);
+        perspCam.lookAt(tgt);
+        renderer.render(scene, perspCam);
+        octx.drawImage(renderer.domElement, 0, 0, W, H);
+        return octx.getImageData(0, 0, W, H).data;
+      };
+      const f1 = grab();
+      const toward = new THREE.Vector3().subVectors(tgt, pos).normalize().multiplyScalar(jitter);
+      perspCam.position.add(toward);
+      perspCam.lookAt(tgt);
+      renderer.render(scene, perspCam);
+      octx.drawImage(renderer.domElement, 0, 0, W, H);
+      const f2 = octx.getImageData(0, 0, W, H).data;
+      const mask = new Uint8Array(W * H);
+      for (let i = 0, p = 0; i < f1.length; i += 4, p++) {
+        const d = Math.abs(f1[i] - f2[i]) + Math.abs(f1[i+1] - f2[i+1]) + Math.abs(f1[i+2] - f2[i+2]);
+        if (d > 45) mask[p] = 1;
+      }
+      let inner = 0;
+      for (let yy = 1; yy < H - 1; yy++) for (let xx = 1; xx < W - 1; xx++) {
+        const p = yy * W + xx;
+        if (mask[p] && mask[p-1] && mask[p+1] && mask[p-W] && mask[p+W]) inner++;
+      }
+      worst = Math.max(worst, inner / (W * H) * 100);
+    }
+    result[D] = Math.round(worst * 100) / 100;
+  }
+  perspCam.position.copy(camSave);
+  controls.target.copy(tgtSave);
+  return result;
+};
 
 /* 频闪压力测试：36 个环视机位，每个机位向目标推进 3cm 渲两帧。
    3cm 在数十米距离上视差 <0.5px，正常表面像素应当不变；
