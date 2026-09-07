@@ -344,7 +344,7 @@ const FLOORS = [
     walls: [
       { a: [0, 0], b: [10.6, 0], t: 0.2, h: 4.0, name: '北外墙', ops: [
         { o: 0.80, w: 0.7, s: 0.9, h: 1.4, type: 'win', code: 'C0714' },
-        { o: 2.30, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
+        { o: 2.50, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
         { o: 5.30, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
         { o: 8.30, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
       ]},
