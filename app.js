@@ -90,6 +90,7 @@ const whiteGlass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 
 const wireBasic = new THREE.MeshBasicMaterial({ color: 0xf8f5ed, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const wireGlass = new THREE.MeshBasicMaterial({ color: 0xdfe7ec, transparent: true, opacity: 0.22, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x2a2620 });
+const exitSignMat = new THREE.MeshStandardMaterial({ color: 0x0b3d22, roughness: 0.5, emissive: 0x18e05a, emissiveIntensity: 0 });
 
 /* ---------- 家具类型名 ---------- */
 const TYPE_NAME = {
@@ -225,12 +226,16 @@ function buildStairs(parent) {
   parent.add(g);
 }
 /* 电梯 */
-function buildElevator(parent) {
+function buildElevator(parent, h) {
   const g = new THREE.Group();
   addEdges(g, box(1.3, 2.3, 1.5, MAT.steel, 1.25, 0, 11.0, 0, g));
   box(1.1, 0.06, 1.3, MAT.wood, 1.25, 0.02, 11.0, 0, g, false);
   box(0.06, 0.35, 0.25, MAT.black, 1.98, 1.1, 10.75, 0, g, false);
-  g.userData = { pick: 'furn', name: '电梯（井道+轿厢）', room: 'dt', desc: '1800×2200 电梯井，轿厢贯通 1—9 层；东壁电梯门与呼叫面板（剖面图注"电梯一"）。' };
+  /* 出口标识灯箱：电梯门（南壁）正上方，夜间自发光 */
+  const sign = box(0.5, 0.16, 0.05, exitSignMat, 1.25, (h || 3) * 0.52, 12.28, 0, g, false);
+  glowMeshes.push({ mesh: sign });
+  box(0.06, 0.35, 0.25, MAT.black, 0.5, 1.05, 12.32, 0, g, false); // 呼叫面板
+  g.userData = { pick: 'furn', name: '电梯（井道+轿厢）', room: 'dt', desc: '1800×2200 电梯井，轿厢贯通 1—9 层；南壁电梯门与呼叫面板（剖面图注"电梯一"）。出电梯门向南即厅廊：正前 M1021 直通露台，向东经洞口入茶室/两房一厅客厅。' };
   parent.add(g);
   return g;
 }
@@ -507,7 +512,7 @@ FLOORS.forEach(F0 => {
   });
 
   /* 楼梯 / 电梯 / 屋面板 */
-  if (F0.core) { buildStairs(solid); buildElevator(solid); }
+  if (F0.core) { buildStairs(solid); buildElevator(solid, F0.h); }
   if (F0.id === 'fb1') buildB1Stairs(solid);
   if (F0.roof) {
     box(10.4, 0.15, 19.7, MAT.slab, 5.3, -0.20, 9.95, 0, solid, false);
