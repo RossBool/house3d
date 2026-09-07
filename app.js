@@ -1454,7 +1454,8 @@ window.__openCheck = () => {
         for (const op of v.ops) {
           if (!['win', 'door', 'slide', 'pass', 'lift'].includes(op.type)) continue;
           const o1 = op.o - op.w / 2, o2 = op.o + op.w / 2;
-          if (s > o1 - 0.02 && s < o2 + 0.02) {
+          const crossed = t2 > 0.02 && t2 < Lv - 0.02;
+          if (crossed && s > o1 - 0.02 && s < o2 + 0.02) {
             out.push(`[${F0.id}] 「${v.name}」的 ${op.code} 开洞(${o1.toFixed(2)}–${o2.toFixed(2)})被「${w.name}」在 s=${s.toFixed(2)} 处截断`);
           }
         }
