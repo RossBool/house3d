@@ -211,6 +211,8 @@
   #ncCats button{font-family:inherit;font-size:11px;padding:3px 10px;border:1px solid var(--line);background:transparent;border-radius:3px;cursor:pointer;color:var(--ink2)}
   #ncCats button.on{background:var(--ink);color:#f6f2e9;border-color:var(--ink)}
   #ncAuthor{width:100%;font-family:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:#fffdf8;color:var(--ink);box-sizing:border-box;margin-bottom:8px}
+  #ncWarn{display:none;color:#b5442d;font-size:11px;line-height:1.55;margin-top:6px}
+  #ncWarn.on{display:block}
   #ncText{width:100%;min-height:78px;resize:vertical;font-family:inherit;font-size:13px;line-height:1.6;padding:8px;border:1px solid var(--line);border-radius:4px;background:#fffdf8;color:var(--ink);box-sizing:border-box}
   #ncActions{display:flex;gap:8px;margin-top:10px}
   #ncActions button{flex:1;font-family:inherit;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink2)}
@@ -332,13 +334,14 @@
   <div id="ncCats"></div>
   <input id="ncAuthor" maxlength="12" placeholder="你的名字/昵称（用于署名）" />
   <textarea id="ncText" placeholder="描述问题：位置不对 / 朝向反了 / 尺寸偏差 / 材质不符 / 建议增删…"></textarea>
+  <div id="ncWarn">内容疑似无意义（纯数字/重复字符/过短），提交后会被自动驳回</div>
   <div id="ncActions"><button id="ncCancel">取消</button><button id="ncSave">保存批注</button></div>
 </div>
 <div id="hint">左键拖拽旋转 · 滚轮缩放 · <b>点击房间/家具</b>查看讲解 · <b>VR 漫游</b>：拖拽环视/点地行走 · <b>右侧切换楼层</b> · 快捷键 <b>1/2/3</b> 材质 <b>N</b> 昼夜 <b>F</b> 家具 <b>P</b> 平面图 <b>R</b> 复位</div>
 
-<script src="./data.js?v=33"></script>
+<script src="./data.js?v=34"></script>
 <script type="importmap">{ "imports": { "three": "./libs/three.module.js" } }</script>
-<script type="module" src="./app.js?v=33"></script>
+<script type="module" src="./app.js?v=34"></script>
 <script>
   window.__errs = [];
   window.addEventListener('error', e => window.__errs.push(e.message + ' @' + (e.filename||'') + ':' + e.lineno));
