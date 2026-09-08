@@ -191,12 +191,19 @@ export default {
           const txt = v => Array.isArray(v) ? v.map(x => x.text || x.name || '').join('') : (v?.text || v || '');
           const att = Array.isArray(f['缩略图']) && f['缩略图'][0] ? f['缩略图'][0] : null;
           const coords = String(txt(f['坐标']) || '').replace(/[xy]/g, '').trim().split(/\s+/).map(Number);
+          /* 视角文本形如 "(21,42.9,30)→(5.3,27.4,9.5)"，解析回相机位姿，云端批注也能精确复现视角 */
+          let cam = null;
+          const vm = /\(([^)]+)\)\s*→\s*\(([^)]+)\)/.exec(String(txt(f['视角']) || ''));
+          if (vm) {
+            const p = vm[1].split(',').map(Number), t = vm[2].split(',').map(Number);
+            if (p.length === 3 && t.length === 3 && p.every(n => !isNaN(n)) && t.every(n => !isNaN(n))) cam = { p, t };
+          }
           return {
             id: txt(f['批注ID']), remote: true, recordId: it.record_id,
             floorName: txt(f['楼层']), obj: txt(f['对象']), kind: txt(f['类型']),
             cat: txt(f['类别']), text: txt(f['意见']),
             coords: coords.length === 2 ? coords : [0, 0],
-            cam: null, imgUrl: att ? att.url || att.tmp_url : '',
+            cam, imgUrl: att ? att.url || att.tmp_url : '',
             author: txt(f['署名']), status: txt(f['状态']) || '待处理',
             ts: f['时间'] ? new Date(Number(f['时间'])).toISOString().slice(0, 16).replace('T', ' ') : '',
           };
