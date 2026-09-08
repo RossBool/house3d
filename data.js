@@ -270,9 +270,11 @@ function bigFloor(z, level) {
       { a: [0, 4.95], b: [3.5, 4.95], t: 0.2, h: H_STD, name: '卧室南墙', ops: [
         { o: 2.1, w: 0.9, s: 0, h: 2.1, type: 'door', code: 'M0921', swing: ['n', -1] },
       ]},
-      { a: [2.4, 3.4], b: [2.4, 9.5], t: 0.12, h: H_STD, name: '玄关楼梯间墙', ops: [
-        { o: 0.5, w: 1.0, s: 0, h: 2.1, type: 'door', code: 'M1021', swing: ['e', +1] },
-        { o: 3.1, w: 1.2, s: 0, h: 2.1, type: 'door', code: 'M1221', swing: ['e', +1] },
+      { a: [2.4, 4.95], b: [2.4, 9.5], t: 0.12, h: H_STD, name: '玄关楼梯间墙', ops: [
+        { o: 1.55, w: 1.2, s: 0, h: 2.1, type: 'door', code: 'M1221', swing: ['e', +1] },
+      ]},
+      { a: [3.5, 3.95], b: [7.0, 3.95], t: 0.2, h: H_STD, name: '卧室B南墙', ops: [
+        { o: 2.35, w: 0.9, s: 0, h: 2.1, type: 'door', code: 'M0921', swing: ['s', +1] },
       ]},
       { a: [7.0, -1.3], b: [7.0, 9.45], t: 0.2, h: H_STD, name: '卧室过厅墙', ops: [
         { o: 5.5, w: 0.9, s: 0, h: 2.1, type: 'door', code: 'M0921', swing: ['e', +1] },
@@ -320,7 +322,8 @@ function bigFloor(z, level) {
       { id: 'ymj', name: '衣帽间', bbox: [8.75, 11.45, 11.75, 13.3], floor: 'wood' },
       { id: 'lt', name: '楼梯间', bbox: [0.2, 5.2, 2.3, 9.3], floor: 'stone', stair: true },
       { id: 'dt', name: '电梯厅', bbox: [0.2, 9.7, 2.3, 13.3], floor: 'stone' },
-      { id: 'gt', name: '过厅', bbox: [2.7, 3.7, 6.85, 13.3], floor: 'stone' },
+      { id: 'gt', name: '过厅', bbox: [2.5, 4.85, 6.85, 13.3], floor: 'stone' },
+      { id: 'gtN', name: '玄关', bbox: [3.6, 4.05, 6.85, 4.85], floor: 'stone' },
       { id: 'kt', name: '客厅', bbox: [0.2, 13.8, 6.85, 19.8], floor: 'wood' },
       { id: 'zrf', name: '主人房', bbox: [7.2, 13.8, 10.5, 19.8], floor: 'wood' },
       { id: 'zws', name: '主卫', bbox: [10.85, 15.6, 11.75, 18.2], floor: 'tile' },
@@ -393,7 +396,7 @@ const FLOORS = [
         { o: 0.9, w: 0.7, s: 0.9, h: 1.4, type: 'win', code: 'C0714' },
         { o: 2.2, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
       ]},
-      { a: [11.9, -1.3], b: [11.9, 20.0], t: 0.2, h: 4.0, name: '东外墙', ops: [
+      { a: [11.9, -1.3], b: [11.9, 13.5], t: 0.2, h: 4.0, name: '东外墙', ops: [
         { o: 0.55, w: 0.7, s: 0.9, h: 1.4, type: 'win', code: 'C0714' },
         { o: 3.75, w: 3.0, s: 0.9, h: 1.8, type: 'win', code: 'C3018' },
         { o: 6.4, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
@@ -403,7 +406,7 @@ const FLOORS = [
         { o: 13.7, w: 2.0, s: 0.9, h: 1.8, type: 'win', code: 'C2018' },
       ]},
       { a: [0, 20.0], b: [11.9, 20.0], t: 0.2, h: H_PARAPET, parapet: true, name: '露台南女儿墙', ops: [] },
-      { a: [0, -1.3], b: [0, 20.0], t: 0.2, h: 4.0, name: '西外墙', ops: [
+      { a: [0, -1.3], b: [0, 13.5], t: 0.2, h: 4.0, name: '西外墙', ops: [
         { o: 3.35, w: 1.8, s: 0.9, h: 1.8, type: 'win', code: 'C1818' },
         { o: 8.6, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
         { o: 12.8, w: 1.2, s: 0.9, h: 1.8, type: 'win', code: 'C1218' },
@@ -450,7 +453,6 @@ const FLOORS = [
     rooms: [
       { id: 'bsF', name: '浴室', bbox: [0.2, -1.1, 1.45, -0.2], floor: 'tile' },
       { id: 'wsF', name: '卫生间', bbox: [1.7, -1.1, 3.35, -0.2], floor: 'tile' },
-      { id: 'xyj', name: '洗衣间', bbox: [3.7, -1.1, 11.75, -0.05], floor: 'tile' },
       { id: 'woshi', name: '卧室', bbox: [0.2, 0.2, 3.35, 5.35], floor: 'wood',
         enter: { pos: [1.75, 1.6, 4.6], look: [1.75, 0.8, 1.2] },
         desc: '主卧，约 12.2㎡，床尾东向衣柜布置，北门 M1021 贴墙端。' },
@@ -475,7 +477,7 @@ const FLOORS = [
         desc: '正式会客厅约 43㎡，沙发组朝西，电视墙居南，C2018 东窗纳景，M1627 推拉门连过厅。”' },
       { id: 'chashi', name: '茶室', bbox: [3.7, 9.7, 11.75, 13.3], floor: 'wood',
         enter: { pos: [4.4, 1.6, 10.6], look: [8.6, 0.9, 12.0] },
-        desc: '茶室约 34㎡，图纸此间未布置家具，为留白待陈设的品茗空间；北通会客厅，南 M1627 推拉门整片开启直入露台。”' },
+        desc: '茶室约 34㎡，图纸此间未布置家具；应业主要求补置曲尺茶榻、茶桌（含整套茶具）与北墙博古架，为留白空间提供品茗场景。北通会客厅，南 M1627 推拉门整片开启直入露台。”' },
       { id: 'lutai', name: '露台', bbox: [0.2, 13.7, 11.75, 19.8], floor: 'deck',
         enter: { pos: [9.4, 3.2, 14.2], look: [1.2, 0.5, 18.8] },
         desc: '整层南向大露台约 63㎡，面层 1%、2% 找坡排水，四周女儿墙与泄水孔按露台大样施工；西南角弧形花池，M1021 兼作屋面出入口。”' },
@@ -497,6 +499,11 @@ const FLOORS = [
       { room: 'guoting', type: 'rug', pos: [9.65, 8.1], rot: 0, s: 0.75, name: '地毯', desc: '沙发组地毯，图纸绘花饰。' },
       { room: 'guoting', type: 'coffeeTable', pos: [9.68, 7.15], rot: 0, name: '茶几', desc: '沙发组中央茶几——图纸原位。' },
       { room: 'guoting', type: 'tvUnit', pos: [9.9, 9.15], rot: 0, name: '电视柜', desc: '长几贴南墙，与沙发组相对——图纸原位。' },
+      { room: 'chashi', type: 'shelf', pos: [5.6, 9.95], rot: 0, name: '博古架', desc: '北墙 2400 长博古架，陈列紫砂壶、茶盏与茶宠——业主指定补置。' },
+      { room: 'chashi', type: 'lSofa', pos: [5.3, 11.6], rot: 0, s: 0.75, name: '曲尺茶榻', desc: 'L 型曲尺茶榻，围合出品茗主位——业主指定补置。' },
+      { room: 'chashi', type: 'teaTable', pos: [7.2, 11.5], rot: 0, name: '茶桌', desc: '1500×900 茶桌，桌面置整套茶具（壶、公道、茶盏）——业主指定补置。' },
+      { room: 'chashi', type: 'chair', pos: [7.35, 10.6], rot: Math.PI, name: '茶凳', desc: '茶桌两侧茶凳之一。' },
+      { room: 'chashi', type: 'chair', pos: [7.35, 12.4], rot: 0, name: '茶凳', desc: '茶桌两侧茶凳之二。' },
       { room: 'lutai', type: 'flowerPool', pos: [0.15, 19.8], rot: 0, name: '弧形花池', desc: '西南角 1/4 圆弧花池，内植灌木球——对应图纸西南角弧形构筑。' },
     ],
     mark: [4.8, 7.5, '26.900'],
@@ -569,7 +576,8 @@ const FLOORS = [
       { id: 'ws', name: '卫生间', bbox: [0.1, 5.6, 2.4, 7.7], floor: 'tile' },
       { id: 'lt', name: '楼梯间', bbox: [0.1, 7.9, 2.4, 9.4], floor: 'stone', stair: true },
       { id: 'dt', name: '电梯厅', bbox: [0.1, 9.6, 2.4, 11.8], floor: 'stone' },
-      { id: 'gt', name: '过厅', bbox: [2.6, 6.1, 5.9, 11.8], floor: 'cement' },
+      { id: 'gt', name: '过厅', bbox: [2.6, 8.0, 5.9, 11.8], floor: 'cement' },
+      { id: 'gtW', name: '过厅', bbox: [2.6, 6.1, 3.9, 8.0], floor: 'cement' },
       { id: 'lt2', name: '车库楼梯', bbox: [4.0, 6.2, 5.9, 7.9], floor: 'cement' },
       { id: 'wsW', name: '卫生间（水电预埋）', bbox: [6.1, 9.7, 7.9, 11.8], floor: 'tile' },
       { id: 'pm1', name: '铺面 ①', bbox: [0.1, 12.2, 2.4, 18.3], floor: 'cement' },
