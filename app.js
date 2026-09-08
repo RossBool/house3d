@@ -865,8 +865,11 @@ renderer.domElement.addEventListener('click', e => {
     return;
   }
   const o = pickAt(e.clientX, e.clientY);
+  if (reviewMode) {
+    if (!o) { if (composerEmpty()) closeComposer(); return; }
+    openComposer(o); return;
+  }
   if (!o) return;
-  if (reviewMode) { openComposer(o); return; }
   if (o.userData.pick === 'room') {
     showInfo({ pick: 'room', room: o.userData.room });
     const [x1, y1, x2, y2] = o.userData.room.bbox;
@@ -1381,6 +1384,9 @@ function buildRoomList() {
 }
 
 addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeComposer(); return; }
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;   // 输入中不触发快捷键
   if (e.key === '1') setMode('real');
   if (e.key === '2') setMode('white');
   if (e.key === '3') setMode('wire');
@@ -1619,6 +1625,25 @@ function openComposer(o) {
   $('#ncText').focus();
 }
 function closeComposer() { $('#noteComposer').classList.remove('open'); pendingPick = null; }
+function composerEmpty() {
+  const el = $('#ncText');
+  return !$('#noteComposer').classList.contains('open') || !el.value.trim();
+}
+/* 指针离开模型（画布）后，未输入的批注弹窗自动收起；正在输入或已写内容则保留，避免误关丢字 */
+let lastPtr = { x: -1, y: -1 };
+addEventListener('pointermove', e => { lastPtr = { x: e.clientX, y: e.clientY }; }, { passive: true });
+renderer.domElement.addEventListener('pointerleave', () => {
+  if (!$('#noteComposer').classList.contains('open')) return;
+  setTimeout(() => {
+    if (!$('#noteComposer').classList.contains('open')) return;
+    const ta = $('#ncText');
+    if (ta.value.trim()) return;                                       // 已写内容 → 保留（防丢字）
+    const r = $('#noteComposer').getBoundingClientRect();
+    const p = lastPtr;
+    if (p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) return;  // 指针移向弹窗 → 保留
+    closeComposer();
+  }, 350);
+});
 function saveNote() {
   const txt = $('#ncText').value.trim();
   if (!txt) { $('#ncText').focus(); return; }
