@@ -599,9 +599,9 @@ const FLOORS = [
       { id: 'pm5', name: '铺面 ③（东侧）', bbox: [8.1, 6.1, 10.5, 9.5], floor: 'cement' },
     ],
     furniture: [
-      { room: 'gga', type: 'car', pos: [4.3, 1.45], rot: Math.PI / 2, s: 0.55, name: '轿车', desc: '公共车库泊位轿车（4.4×1.78），车头朝西沿北墙停放。' },
-      { room: 'sja', type: 'car', pos: [7.35, 3.0], rot: Math.PI / 2, name: '轿车', desc: '私人车库泊位轿车之一，车头朝北对 M2730 车库门。' },
-      { room: 'sja', type: 'car', pos: [9.45, 3.0], rot: Math.PI / 2, carRed: true, name: '轿车', desc: '私人车库泊位轿车之二，与西侧车位并列。' },
+      { room: 'gga', type: 'car', pos: [4.3, 1.45], rot: Math.PI / 2, s: 0.55, carType: 'sedan', name: '轿车', desc: '公共车库泊位小型轿车，车头朝北停放，让开人行门 M0821。' },
+      { room: 'sja', type: 'car', pos: [7.2, 3.0], rot: Math.PI / 2, carType: 'suv', name: 'SUV', desc: '私人车库泊位之一：SUV，车头朝北对 M2730 车库门。' },
+      { room: 'sja', type: 'car', pos: [9.3, 3.0], rot: Math.PI / 2, carType: 'mpv', carRed: true, name: '商务车', desc: '私人车库泊位之二：商务车（侧滑门），与西侧车位并列。' },
     ],
     mark: [4.7, 13.6, '±0.000'],
   },
