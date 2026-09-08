@@ -644,7 +644,7 @@ FLOORS.forEach(F0 => {
     g.position.set(f.pos[0], 0, f.pos[1]);
     g.rotation.y = f.rot || 0;
     if (f.s) g.scale.set(f.s, f.s, f.s);
-    g.userData = { pick: 'furn', floorId: F0.id, name: f.name || TYPE_NAME[f.type] || f.type, desc: f.desc || '', room: f.room || '', carRed: !!f.carRed };
+    g.userData = { pick: 'furn', floorId: F0.id, typeKey: f.type, name: f.name || TYPE_NAME[f.type] || f.type, desc: f.desc || '', room: f.room || '', carRed: !!f.carRed };
     furn.add(g);
     pickables.push(g);
     F[f.type] && F[f.type](g);
