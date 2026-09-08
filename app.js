@@ -1674,7 +1674,7 @@ function toggleReview() {
   reviewMode = !reviewMode;
   $('#btnReview').classList.toggle('on', reviewMode);
   renderer.domElement.style.cursor = reviewMode ? 'crosshair' : '';
-  if (reviewMode) { renderNotes(); $('#notePanel').classList.add('open'); if (!notes.length) $('#notePanel').classList.remove('open'); }
+  if (reviewMode) { renderNotes(); $('#notePanel').classList.add('open'); }
   else { closeComposer(); $('#notePanel').classList.remove('open'); }
 }
 $('#btnReview').onclick = toggleReview;
