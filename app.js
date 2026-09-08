@@ -89,6 +89,9 @@ const MAT = {
   lamp: new THREE.MeshStandardMaterial({ color: 0xf5e6c8, roughness: 0.6, emissive: 0xffd9a0, emissiveIntensity: 0 }),
   rattan: std(0xb08d5f, 0.85),
   water: std(0x9fc4d0, 0.2, 0.1),
+  carBody: std(0x33455c, 0.32, 0.55),
+  carBody2: std(0x8f3b34, 0.34, 0.5),
+  carGlass: std(0x16202b, 0.18, 0.45),
 };
 /* 防频闪：面统一推后深度，让共面构造的描边线恒赢深度测试（否则运动时棱线马赛克闪烁） */
 const FACE_OFFSET = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 3 };
@@ -121,7 +124,7 @@ const TYPE_NAME = {
   toilet: '坐便器', basin: '台盆', diningSet: '餐桌椅', sideboard: '餐边柜', plant: '绿植',
   kitchenCounter: '橱柜', fridge: '冰箱', laundry: '洗衣机组', sink: '水槽', sofa3: '三人沙发',
   sofa1: '单人沙发', coffeeTable: '茶几', tvUnit: '电视柜', lSofa: '曲尺沙发', teaTable: '茶桌',
-  shelf: '博古架', table4: '餐桌（4 座）', desk: '书桌', chair: '座椅', bookshelf: '书架', armchair: '单人沙发',
+  shelf: '博古架', car: '轿车', table4: '餐桌（4 座）', desk: '书桌', chair: '座椅', bookshelf: '书架', armchair: '单人沙发',
   console: '条案', flowerPool: '花池', outdoorSet: '户外桌椅', lounger: '躺椅', liftCar: '电梯',
 };
 
@@ -437,6 +440,22 @@ const F = {
       g.add(cg);
     }
   },
+  car(g) {
+    /* 轿车 4.4×1.78×1.4：长轴沿 X，四轮轴沿 Z；车身/座舱/车窗/前后灯 */
+    const paint = (g.userData && g.userData.carRed) ? MAT.carBody2 : MAT.carBody;
+    fb(g, 4.4, 0.5, 1.78, paint, 0, 0.36, 0, 0, true);
+    fb(g, 2.1, 0.44, 1.6, paint, -0.35, 0.86, 0, 0, true);
+    fb(g, 1.92, 0.26, 1.64, MAT.carGlass, -0.35, 0.9, 0);
+    fb(g, 0.95, 0.2, 1.62, paint, 1.45, 0.66, 0);
+    for (const [wx, wz] of [[-1.42, 0.84], [1.42, 0.84], [-1.42, -0.84], [1.42, -0.84]]) {
+      const w = cyl(g, 0.31, 0.22, MAT.black, wx, 0.2, wz, 14);
+      w.rotation.x = Math.PI / 2;
+    }
+    fb(g, 0.07, 0.14, 0.42, MAT.lamp, -2.2, 0.55, 0.55);
+    fb(g, 0.07, 0.14, 0.42, MAT.lamp, -2.2, 0.55, -0.55);
+    fb(g, 0.07, 0.14, 0.42, MAT.black, 2.2, 0.6, 0.55);
+    fb(g, 0.07, 0.14, 0.42, MAT.black, 2.2, 0.6, -0.55);
+  },
   teaTable(g) {
     fb(g, 1.5, 0.06, 0.9, MAT.woodDark, 0, 0.3, 0, 0, true);
     fb(g, 1.3, 0.28, 0.7, MAT.black, 0, 0, 0);
@@ -603,7 +622,8 @@ FLOORS.forEach(F0 => {
   });
 
   /* 楼梯 / 电梯 / 屋面板 */
-  if (F0.core) { buildStairs(solid); buildElevator(solid, F0.h); }
+  if (F0.core) buildStairs(solid);
+  if (F0.core || F0.lift) buildElevator(solid, F0.h);
   if (F0.id === 'fb1') buildB1Stairs(solid);
   if (F0.roof) {
     box(10.4, 0.15, 19.7, MAT.slab, 5.3, -0.20, 9.95, 0, solid, false);
@@ -617,7 +637,7 @@ FLOORS.forEach(F0 => {
     g.position.set(f.pos[0], 0, f.pos[1]);
     g.rotation.y = f.rot || 0;
     if (f.s) g.scale.set(f.s, f.s, f.s);
-    g.userData = { pick: 'furn', floorId: F0.id, name: f.name || TYPE_NAME[f.type] || f.type, desc: f.desc || '', room: f.room || '' };
+    g.userData = { pick: 'furn', floorId: F0.id, name: f.name || TYPE_NAME[f.type] || f.type, desc: f.desc || '', room: f.room || '', carRed: !!f.carRed };
     furn.add(g);
     pickables.push(g);
     F[f.type] && F[f.type](g);
