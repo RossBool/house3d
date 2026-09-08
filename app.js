@@ -1670,6 +1670,11 @@ function openComposerAt({ obj, kind, coords, region }) {
   $('#ncText').focus();
 }
 function closeComposer() { $('#noteComposer').classList.remove('open'); $('#ncWarn').classList.remove('on'); pendingPick = null; }
+/* 批注面板开关：同步 body 类，让楼层切换器自动让位（面板不再挡住切层） */
+function setNotePanel(open) {
+  $('#notePanel').classList.toggle('open', !!open);
+  document.body.classList.toggle('notes-open', !!open);
+}
 /* 批注锚点：先试当前楼层平面（仅当交点落在建筑轮廓内），否则落室外地面 */
 const ENVELOPE = { x1: -1.6, y1: -2.9, x2: 13.5, y2: 21.6 };
 function anchorHit(cx, cy) {
@@ -1831,7 +1836,7 @@ function saveNote() {
     author: noteAuthor(), cat: pendingCat, text: txt, status: '待处理',
     ...pendingPick,
   });
-  saveNotes(); closeComposer(); renderNotes(); $('#notePanel').classList.add('open');
+  saveNotes(); closeComposer(); renderNotes(); setNotePanel(true);
   pushNote(notes[0]);
 }
 /* ---------- 云端同步 ---------- */
@@ -1954,11 +1959,11 @@ function toggleReview() {
   reviewMode = !reviewMode;
   $('#btnReview').classList.toggle('on', reviewMode);
   renderer.domElement.style.cursor = reviewMode ? 'crosshair' : '';
-  if (reviewMode) { renderNotes(); rebuildPins(); $('#notePanel').classList.add('open'); startSync(); }
-  else { closeComposer(); $('#notePanel').classList.remove('open'); stopSync(); }
+  if (reviewMode) { renderNotes(); rebuildPins(); setNotePanel(true); startSync(); }
+  else { closeComposer(); setNotePanel(false); stopSync(); }
 }
 $('#btnReview').onclick = toggleReview;
-$('#noteClose').onclick = () => { $('#notePanel').classList.remove('open'); };
+$('#noteClose').onclick = () => { setNotePanel(false); };
 $('#ncCancel').onclick = closeComposer;
 $('#ncSave').onclick = saveNote;
 /* 提交前的轻量自检：明显无意义的输入给出提示（服务端仍会独立审查） */
