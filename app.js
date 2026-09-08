@@ -1575,6 +1575,11 @@ let pendingPick = null;
 let pendingCat = '位置';
 const NOTE_KEY = 'house3d-notes-v1';
 const NOTE_CATS = ['位置', '朝向', '尺寸', '材质', '增删', '其他'];
+/* 云端同步：飞书多维表格（经 Cloudflare Worker 代理）
+   部署 worker/feishu-proxy.js 后把地址填在这里；留空 = 纯本地模式。
+   也可用 ?sync=https://xxx.workers.dev 临时指定（便于联调）。 */
+const SYNC = { url: new URLSearchParams(location.search).get('sync') || '', pollMs: 10000 };
+let remoteNotes = [], syncTimer = null, syncState = 'local';
 const notes = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || '[]'); } catch (e) { return []; } })();
 function saveNotes() { try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) { } }
 function noteAuthor() {
@@ -1625,24 +1630,62 @@ function saveNote() {
     ...pendingPick,
   });
   saveNotes(); closeComposer(); renderNotes(); $('#notePanel').classList.add('open');
+  pushNote(notes[0]);
 }
+/* ---------- 云端同步 ---------- */
+function allNotes() {
+  const localIds = new Set(notes.map(x => x.id));
+  return [...notes, ...remoteNotes.filter(r => !localIds.has(r.id))]
+    .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+}
+async function pushNote(n) {
+  if (!SYNC.url || !n) return;
+  try {
+    const r = await fetch(SYNC.url + '/note', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(n) });
+    const j = await r.json();
+    n.synced = !!(j.code === 0 || j.ok);
+    syncState = n.synced ? 'online' : 'error';
+  } catch (e) { n.synced = false; syncState = 'error'; }
+  saveNotes(); renderNotes();
+}
+async function pullNotes() {
+  if (!SYNC.url) { syncState = 'local'; renderNotes(); return; }
+  try {
+    const r = await fetch(SYNC.url + '/notes');
+    const j = await r.json();
+    if (j.ok) { remoteNotes = j.notes || []; syncState = 'online'; }
+    else syncState = 'error';
+  } catch (e) { syncState = 'error'; }
+  renderNotes();
+}
+function startSync() {
+  if (syncTimer) clearInterval(syncTimer);
+  pullNotes();
+  if (SYNC.url) syncTimer = setInterval(pullNotes, SYNC.pollMs);
+}
+function stopSync() { if (syncTimer) { clearInterval(syncTimer); syncTimer = null; } }
 function renderNotes() {
   const list = $('#noteList');
-  $('#noteCount').textContent = notes.length ? `${notes.length} 条 · 待处理 ${notes.filter(n => n.status === '待处理').length}` : '';
-  if (!notes.length) {
+  const all = allNotes();
+  const others = all.filter(x => x.remote && !notes.some(l => l.id === x.id)).length;
+  const stateTxt = !SYNC.url ? '本地模式' : (syncState === 'online' ? '云端已连接' : (syncState === 'error' ? '云端异常' : '连接中…'));
+  $('#noteCount').textContent = all.length
+    ? `${all.length} 条 · 待处理 ${all.filter(x => x.status === '待处理').length}${others ? ' · 他人 ' + others : ''} · ${stateTxt}`
+    : stateTxt;
+  if (!all.length) {
     list.innerHTML = '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>即可写下意见；意见自动带楼层、对象、坐标与当前视角。</div>';
     return;
   }
-  list.innerHTML = notes.map(n => `
+  list.innerHTML = all.map(n => `
     <div class="note-card ${n.status === '已改' ? 'done' : ''}" data-id="${n.id}">
-      <div class="nc-h"><span class="nc-floor">${n.floorName || n.floor}</span><span class="nc-cat">${n.cat}</span><span class="nc-obj">${n.obj}</span></div>
+      <div class="nc-h"><span class="nc-floor">${n.floorName || n.floor}</span><span class="nc-cat">${n.cat}</span><span class="nc-obj">${n.obj}</span>${n.remote ? '<span class="nc-floor">☁ 他人</span>' : (n.synced ? '<span class="nc-floor">✓ 已同步</span>' : (SYNC.url ? '<span class="nc-floor">… 待同步</span>' : ''))}</div>
       <div class="nc-txt">${n.text.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</div>
       <div class="nc-meta">${n.author} · ${n.ts} · x${n.coords[0]} y${n.coords[1]}</div>
       <div class="nc-acts">
         <button data-a="go">定位</button>
         <button data-a="done" class="${n.status === '已改' ? 'on' : ''}">${n.status === '已改' ? '已改' : '标记已改'}</button>
         <button data-a="copy">复制意见卡</button>
-        <button data-a="del">删除</button>
+        ${n.remote ? '' : '<button data-a="del">删除</button>'}
       </div>
     </div>`).join('');
 }
@@ -1650,21 +1693,24 @@ function noteCardText(n) {
   return `【批注】${n.floorName} · ${n.obj}（${n.kind}）\n类别：${n.cat}\n问题：${n.text}\n位置：x${n.coords[0]} y${n.coords[1]}　视角：(${n.cam.p.join(',')}) → (${n.cam.t.join(',')})\n提出：${n.author} ${n.ts}`;
 }
 function goToNote(n) {
-  if (n.floor !== activeId) switchFloor(n.floor);
-  const p = new THREE.Vector3(...n.cam.p), t = new THREE.Vector3(...n.cam.t);
-  flyTo(p, t, 1.2);
+  const F0 = FLOORS.find(f => f.name === n.floorName) || FLOORS.find(f => f.id === n.floor);
+  if (F0 && F0.id !== activeId) switchFloor(F0.id);
+  if (n.cam) { flyTo(new THREE.Vector3(...n.cam.p), new THREE.Vector3(...n.cam.t), 1.2); return; }
+  const z = F0 ? F0.z : 0;
+  flyTo(new THREE.Vector3(n.coords[0] + 3.2, z + 3.6, n.coords[1] + 3.2), new THREE.Vector3(n.coords[0], z + 1, n.coords[1]), 1.2);
 }
 function exportNotes() {
-  const blob = new Blob([JSON.stringify({ project: META.project, exported: new Date().toISOString(), notes }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ project: META.project, exported: new Date().toISOString(), notes: allNotes() }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'house3d-批注-' + new Date().toISOString().slice(0, 10) + '.json';
   a.click(); URL.revokeObjectURL(a.href);
 }
 function copyMarkdown() {
-  if (!notes.length) return;
-  const md = '# ' + META.project + ' 批注意见（' + notes.length + ' 条）\n\n' +
-    notes.map((n, i) => `${i + 1}. **${n.floorName} · ${n.obj}**（${n.kind}）\n   - 类别：${n.cat}　状态：${n.status}\n   - 问题：${n.text}\n   - 位置：x${n.coords[0]} y${n.coords[1]}\n   - 提出：${n.author} ${n.ts}`).join('\n');
+  const allMd = allNotes();
+  if (!allMd.length) return;
+  const md = '# ' + META.project + ' 批注意见（' + allMd.length + ' 条）\n\n' +
+    allMd.map((n, i) => `${i + 1}. **${n.floorName} · ${n.obj}**（${n.kind}）\n   - 类别：${n.cat}　状态：${n.status}\n   - 问题：${n.text}\n   - 位置：x${n.coords[0]} y${n.coords[1]}\n   - 提出：${n.author} ${n.ts}`).join('\n');
   navigator.clipboard.writeText(md).then(() => {
     const b = $('#noteMd'); const old = b.textContent; b.textContent = '已复制 ✓';
     setTimeout(() => b.textContent = old, 1200);
@@ -1674,8 +1720,8 @@ function toggleReview() {
   reviewMode = !reviewMode;
   $('#btnReview').classList.toggle('on', reviewMode);
   renderer.domElement.style.cursor = reviewMode ? 'crosshair' : '';
-  if (reviewMode) { renderNotes(); $('#notePanel').classList.add('open'); }
-  else { closeComposer(); $('#notePanel').classList.remove('open'); }
+  if (reviewMode) { renderNotes(); $('#notePanel').classList.add('open'); startSync(); }
+  else { closeComposer(); $('#notePanel').classList.remove('open'); stopSync(); }
 }
 $('#btnReview').onclick = toggleReview;
 $('#noteClose').onclick = () => { $('#notePanel').classList.remove('open'); };
@@ -1688,18 +1734,23 @@ $('#ncCats').addEventListener('click', e => {
 });
 $('#noteList').addEventListener('click', e => {
   const b = e.target.closest('button[data-a]'); if (!b) return;
-  const card = b.closest('.note-card'); const n = notes.find(x => x.id === card.dataset.id);
+  const card = b.closest('.note-card'); const n = allNotes().find(x => x.id === card.dataset.id);
   if (!n) return;
   const a = b.dataset.a;
   if (a === 'go') goToNote(n);
-  else if (a === 'done') { n.status = n.status === '已改' ? '待处理' : '已改'; saveNotes(); renderNotes(); }
+  else if (a === 'done') {
+    n.status = n.status === '已改' ? '待处理' : '已改';
+    if (n.remote) { fetch(SYNC.url + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, status: n.status }) }).catch(() => { }); }
+    else { saveNotes(); }
+    renderNotes();
+  }
   else if (a === 'del') { if (confirm('删除这条批注？')) { notes.splice(notes.indexOf(n), 1); saveNotes(); renderNotes(); } }
   else if (a === 'copy') navigator.clipboard.writeText(noteCardText(n)).then(() => { b.textContent = '已复制 ✓'; setTimeout(() => b.textContent = '复制意见卡', 1200); });
 });
 $('#noteExport').onclick = exportNotes;
 $('#noteMd').onclick = copyMarkdown;
 $('#noteClear').onclick = () => { if (notes.length && confirm('清空全部 ' + notes.length + ' 条批注？导出后清空更稳妥。')) { notes.length = 0; saveNotes(); renderNotes(); } };
-window.__notes = { all: () => notes, toggleReview, openComposer, exportNotes };
+window.__notes = { all: () => notes, merged: allNotes, remote: () => remoteNotes, sync: () => ({ url: SYNC.url, state: syncState }), push: pushNote, pull: pullNotes, toggleReview, openComposer, exportNotes };
 window.__app = { setMode, setNight, togglePlan, enterVR, exitVR, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
 /* 全楼层最终去穿插（在所有组装完成后统一执行） */
 for (const id in floorObjs) decollideFloor(floorObjs[id].solid, floorObjs[id].furn);
