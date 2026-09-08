@@ -1633,14 +1633,50 @@ function noteAuthor() {
   try { localStorage.setItem('house3d-author', a); } catch (e) { }
   return a;
 }
-function thumb(maxW, q) {
-  /* 按画布真实宽高比缩放（原实现固定 320×200 会拉伸变形） */
+function thumb(maxW, q, marker) {
+  /* 按画布真实宽高比缩放；marker={x,y,onScreen} 时在图上画出批注点准星 */
   const cv = renderer.domElement;
   const ar = cv.width / cv.height;
   const w = maxW, h = Math.max(2, Math.round(maxW / ar));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  c.getContext('2d').drawImage(cv, 0, 0, w, h);
+  const x = c.getContext('2d');
+  x.drawImage(cv, 0, 0, w, h);
+  if (marker && marker.onScreen) {
+    const mx = marker.x / innerWidth * w, my = marker.y / innerHeight * h;
+    const r = Math.max(12, w * 0.021), lw = Math.max(2.5, w * 0.0042);
+    x.lineWidth = lw + 3; x.strokeStyle = 'rgba(255,255,255,.95)';
+    x.beginPath(); x.arc(mx, my, r, 0, 7); x.stroke();
+    x.lineWidth = lw; x.strokeStyle = '#d93a1f';
+    x.beginPath(); x.arc(mx, my, r, 0, 7); x.stroke();
+    x.beginPath();
+    x.moveTo(mx - r * 1.75, my); x.lineTo(mx + r * 1.75, my);
+    x.moveTo(mx, my - r * 1.75); x.lineTo(mx, my + r * 1.75);
+    x.stroke();
+    x.fillStyle = '#d93a1f'; x.beginPath(); x.arc(mx, my, Math.max(3, w * 0.006), 0, 7); x.fill();
+    if (marker.label) {
+      const fs = Math.max(14, w * 0.017);
+      x.font = `600 ${fs}px -apple-system,Helvetica,sans-serif`;
+      const tw = x.measureText(marker.label).width, pad = fs * 0.45;
+      let lx = mx + r * 1.9, ly = my - r * 1.9 - fs;
+      if (lx + tw + pad * 2 > w) lx = mx - r * 1.9 - tw - pad * 2;
+      if (ly < 4) ly = my + r * 1.9;
+      x.fillStyle = 'rgba(217,58,31,.92)';
+      x.beginPath();
+      x.roundRect ? x.roundRect(lx, ly, tw + pad * 2, fs * 1.7, fs * 0.4) : x.rect(lx, ly, tw + pad * 2, fs * 1.7);
+      x.fill();
+      x.fillStyle = '#fff'; x.textBaseline = 'middle';
+      x.fillText(marker.label, lx + pad, ly + fs * 0.87);
+    }
+  }
   return c.toDataURL('image/jpeg', q);
+}
+/* 批注锚点在屏幕上的位置（用于在缩略图上标出） */
+function anchorScreen(coords, label) {
+  const z = activeFloor().data.z;
+  const v = new THREE.Vector3(coords[0], z + 1.1, coords[1]).project(activeCam);
+  if (v.z > 1) return { x: 0, y: 0, onScreen: false };          // 在相机背后
+  const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
+  return { x, y, label: label || '', onScreen: Math.abs(v.x) <= 1.02 && Math.abs(v.y) <= 1.02 };
 }
 function openComposer(o) {
   const ud = o.userData;
@@ -1660,8 +1696,8 @@ function openComposerAt({ obj, kind, coords, region }) {
     floor: F0.id, floorName: F0.name, obj, kind,
     coords, region: region || null,
     cam: { p: perspCam.position.toArray().map(v => +v.toFixed(2)), t: controls.target.toArray().map(v => +v.toFixed(2)) },
-    img: thumb(560, 0.7),                                  // 本地：列表/导出用，控制 localStorage 体积
-    imgHD: SYNC.url ? thumb(1400, 0.85) : null,            // 云端：飞书附件用高清图
+    img: thumb(640, 0.72, anchorScreen(coords, obj)),                    // 本地：控制体积
+    imgHD: SYNC.url ? thumb(1920, 0.88, anchorScreen(coords, obj)) : null, // 云端：1920 高清 + 准星 + 对象名
   };
   $('#ncTitle').innerHTML = `批注：<b>${obj}</b>${rTxt} <span style="color:var(--ink2);font-size:12px">（${kind} · ${F0.name} · x${coords[0]} y${coords[1]}）</span>`;
   $('#ncCats').innerHTML = NOTE_CATS.map(c => `<button data-c="${c}" class="${c === pendingCat ? 'on' : ''}">${c}</button>`).join('');
