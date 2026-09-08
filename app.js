@@ -1669,7 +1669,7 @@ function openComposerAt({ obj, kind, coords, region }) {
   $('#noteComposer').classList.add('open');
   $('#ncText').focus();
 }
-function closeComposer() { $('#noteComposer').classList.remove('open'); pendingPick = null; }
+function closeComposer() { $('#noteComposer').classList.remove('open'); $('#ncWarn').classList.remove('on'); pendingPick = null; }
 /* 批注锚点：先试当前楼层平面（仅当交点落在建筑轮廓内），否则落室外地面 */
 const ENVELOPE = { x1: -1.6, y1: -2.9, x2: 13.5, y2: 21.6 };
 function anchorHit(cx, cy) {
@@ -1786,7 +1786,7 @@ function rebuildPins() {
     const fid = x.floor || (FLOORS.find(f => f.name === x.floorName) || {}).id;
     return fid === activeId;
   }).forEach(x => {
-    const color = x.status === '已改' ? 0x2e7d4f : 0xb5442d;
+    const color = x.status === '已改' ? 0x2e7d4f : (x.status === '驳回' ? 0x8a8a8a : 0xb5442d);
     const mat = new THREE.MeshBasicMaterial({ color });
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.04, 20), mat);
@@ -1961,6 +1961,18 @@ $('#btnReview').onclick = toggleReview;
 $('#noteClose').onclick = () => { $('#notePanel').classList.remove('open'); };
 $('#ncCancel').onclick = closeComposer;
 $('#ncSave').onclick = saveNote;
+/* 提交前的轻量自检：明显无意义的输入给出提示（服务端仍会独立审查） */
+function looksJunk(t) {
+  const x = (t || '').trim();
+  if (x.length < 2) return true;
+  const letters = (x.match(/[\u4e00-\u9fa5a-zA-Z]/g) || []).length;
+  if (letters === 0) return true;
+  const freq = {}; for (const ch of x) freq[ch] = (freq[ch] || 0) + 1;
+  return Math.max(...Object.values(freq)) / x.length > 0.6;
+}
+$('#ncText').addEventListener('input', () => {
+  $('#ncWarn').classList.toggle('on', looksJunk($('#ncText').value));
+});
 $('#ncCats').addEventListener('click', e => {
   const b = e.target.closest('button[data-c]'); if (!b) return;
   pendingCat = b.dataset.c;
