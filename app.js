@@ -441,20 +441,32 @@ const F = {
     }
   },
   car(g) {
-    /* 轿车 4.4×1.78×1.4：长轴沿 X，四轮轴沿 Z；车身/座舱/车窗/前后灯 */
+    /* 轿车：长轴沿 X，四轮轴沿 Z —— 车身/腰线/座舱/前后挡/侧窗/轮拱/车轮/后视镜/灯组 */
     const paint = (g.userData && g.userData.carRed) ? MAT.carBody2 : MAT.carBody;
-    fb(g, 4.4, 0.5, 1.78, paint, 0, 0.36, 0, 0, true);
-    fb(g, 2.1, 0.44, 1.6, paint, -0.35, 0.86, 0, 0, true);
-    fb(g, 1.92, 0.26, 1.64, MAT.carGlass, -0.35, 0.9, 0);
-    fb(g, 0.95, 0.2, 1.62, paint, 1.45, 0.66, 0);
-    for (const [wx, wz] of [[-1.42, 0.84], [1.42, 0.84], [-1.42, -0.84], [1.42, -0.84]]) {
-      const w = cyl(g, 0.31, 0.22, MAT.black, wx, 0.2, wz, 14);
-      w.rotation.x = Math.PI / 2;
+    const glass = MAT.carGlass, dark = MAT.black;
+    fb(g, 4.5, 0.34, 1.82, paint, 0, 0.30, 0, 0, true);          // 车身下段
+    fb(g, 4.3, 0.26, 1.78, paint, -0.05, 0.64, 0);               // 腰线
+    fb(g, 1.55, 0.06, 1.6, paint, -0.05, 0.90, 0);               // 车顶
+    fb(g, 1.75, 0.44, 1.62, paint, -0.15, 0.90, 0, 0, true);     // 座舱框架
+    const ws = fb(g, 0.05, 0.52, 1.56, glass, -1.16, 0.86, 0); ws.rotation.z = -0.62;  // 前挡
+    const rw = fb(g, 0.05, 0.46, 1.56, glass, 0.82, 0.88, 0); rw.rotation.z = 0.66;    // 后挡
+    fb(g, 1.5, 0.3, 1.66, glass, -0.1, 0.94, 0);                 // 侧窗带
+    fb(g, 0.85, 0.22, 1.72, paint, 1.55, 0.66, 0);               // 引擎盖
+    fb(g, 0.7, 0.2, 1.72, paint, -1.72, 0.66, 0);                // 尾箱盖
+    for (const wx of [-1.42, 1.42]) fb(g, 0.98, 0.34, 1.86, dark, wx, 0.24, 0);  // 轮拱
+    for (const [wx, wz] of [[-1.42, 0.85], [1.42, 0.85], [-1.42, -0.85], [1.42, -0.85]]) {
+      const tyre = cyl(g, 0.33, 0.24, dark, wx, 0.18, wz, 16);
+      tyre.rotation.x = Math.PI / 2;
+      const rim = cyl(g, 0.17, 0.26, MAT.steel, wx, 0.18, wz, 12);
+      rim.rotation.x = Math.PI / 2;
     }
-    fb(g, 0.07, 0.14, 0.42, MAT.lamp, -2.2, 0.55, 0.55);
-    fb(g, 0.07, 0.14, 0.42, MAT.lamp, -2.2, 0.55, -0.55);
-    fb(g, 0.07, 0.14, 0.42, MAT.black, 2.2, 0.6, 0.55);
-    fb(g, 0.07, 0.14, 0.42, MAT.black, 2.2, 0.6, -0.55);
+    for (const mz of [0.95, -0.95]) fb(g, 0.14, 0.07, 0.16, paint, -1.05, 1.02, mz);  // 后视镜
+    fb(g, 0.06, 0.16, 0.44, MAT.lamp, -2.24, 0.58, 0.52);        // 前灯
+    fb(g, 0.06, 0.16, 0.44, MAT.lamp, -2.24, 0.58, -0.52);
+    fb(g, 0.06, 0.14, 0.4, MAT.black, 2.24, 0.6, 0.52);          // 尾灯
+    fb(g, 0.06, 0.14, 0.4, MAT.black, 2.24, 0.6, -0.52);
+    fb(g, 0.03, 0.13, 0.36, MAT.white, -2.26, 0.44, 0);          // 前车牌
+    fb(g, 0.03, 0.13, 0.36, MAT.white, 2.26, 0.44, 0);           // 后车牌
   },
   teaTable(g) {
     fb(g, 1.5, 0.06, 0.9, MAT.woodDark, 0, 0.3, 0, 0, true);
