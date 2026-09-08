@@ -1920,9 +1920,20 @@ function visibleNotes() {
   return allNotes().filter(x => showDone || x.status !== '已改');
 }
 function allNotes() {
-  const localIds = new Set(notes.map(x => x.id));
-  return [...notes, ...remoteNotes.filter(r => !localIds.has(r.id))]
-    .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+  /* 合并规则（第一性原理）：
+     - 同一条批注同时存在本地与云端时，**状态以服务端为准**（状态是多人协作字段，
+       别人在表格里改了、或后台改了，本机必须能看到）；
+     - 例外：本地刚改、还没推成功（statusDirty）时保留本地值，避免被回滚；
+     - 其余字段（缩略图等）以本地为准。 */
+  const byId = new Map();
+  notes.forEach(x => byId.set(x.id, x));
+  remoteNotes.forEach(r => {
+    const l = byId.get(r.id);
+    if (!l) { byId.set(r.id, r); return; }
+    if (!l.statusDirty) l.status = r.status;      // 服务端权威
+    if (r.cam && !l.cam) l.cam = r.cam;
+  });
+  return [...byId.values()].sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
 }
 async function pushNote(n) {
   if (!SYNC.url || !n) return;
@@ -1979,6 +1990,7 @@ function renderNotes() {
         <button data-a="go">定位</button>
         <button data-a="done" class="${n.status === '已改' ? 'on' : ''}">${n.status === '已改' ? '已改' : '标记已改'}</button>
         <button data-a="copy">复制意见卡</button>
+        ${n.statusSyncFailed ? '<button data-a="retry">状态未同步，重试</button>' : ''}
         ${n.remote ? '' : '<button data-a="del">删除</button>'}
       </div>
     </div>`).join('');
@@ -2078,14 +2090,25 @@ $('#noteList').addEventListener('click', e => {
   if (a === 'go') goToNote(n);
   else if (a === 'done') {
     n.status = n.status === '已改' ? '待处理' : '已改';
-    if (n.remote || n.synced) {
-      fetch(SYNC.url + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, status: n.status }) }).catch(() => { });
+    const needPush = (n.remote || n.synced) && SYNC.url;
+    if (needPush) {
+      n.statusDirty = true;                        // 推送完成前不允许被云端覆盖
+      fetch(SYNC.url + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, status: n.status }) })
+        .then(r => r.json())
+        .then(j => { if (j && (j.code === 0 || j.ok)) { delete n.statusDirty; } else { n.statusSyncFailed = true; } })
+        .catch(() => { n.statusSyncFailed = true; })
+        .finally(() => { if (!n.remote) saveNotes(); renderNotes(); });
     }
     if (!n.remote) saveNotes();
     renderNotes();
   }
   else if (a === 'del') { if (confirm('删除这条批注？')) { notes.splice(notes.indexOf(n), 1); saveNotes(); renderNotes(); } }
   else if (a === 'copy') navigator.clipboard.writeText(noteCardText(n)).then(() => { b.textContent = '已复制 ✓'; setTimeout(() => b.textContent = '复制意见卡', 1200); });
+  else if (a === 'retry') {
+    fetch(SYNC.url + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, status: n.status }) })
+      .then(r => r.json())
+      .then(j => { if (j && (j.code === 0 || j.ok)) { delete n.statusSyncFailed; delete n.statusDirty; if (!n.remote) saveNotes(); renderNotes(); } });
+  }
 });
 $('#noteExport').onclick = exportNotes;
 $('#noteMd').onclick = copyMarkdown;
