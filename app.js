@@ -1592,6 +1592,19 @@ const NOTE_CATS = ['位置', '朝向', '尺寸', '材质', '增删', '其他'];
    也可用 ?sync=https://xxx.workers.dev 临时指定（便于联调）。 */
 const SYNC = { url: new URLSearchParams(location.search).get('sync') || '', pollMs: 10000 };
 let remoteNotes = [], syncTimer = null, syncState = 'local';
+/* 云端地址优先取 ?sync= 参数，其次读仓库根目录 sync.json（{"url":"https://..."}）
+   —— 换后端只改 sync.json，无需改代码重新发布 */
+if (!SYNC.url) {
+  fetch('./sync.json?t=' + Date.now())
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => {
+      if (j && j.url) {
+        SYNC.url = String(j.url).replace(/\/+$/, '');
+        if (reviewMode) { pullNotes(); if (SYNC.url && !syncTimer) syncTimer = setInterval(pullNotes, SYNC.pollMs); }
+      }
+    })
+    .catch(() => { });
+}
 const notes = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || '[]'); } catch (e) { return []; } })();
 function saveNotes() { try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) { } }
 function noteAuthor() {
