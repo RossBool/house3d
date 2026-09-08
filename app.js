@@ -1885,8 +1885,10 @@ $('#noteList').addEventListener('click', e => {
   if (a === 'go') goToNote(n);
   else if (a === 'done') {
     n.status = n.status === '已改' ? '待处理' : '已改';
-    if (n.remote) { fetch(SYNC.url + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, status: n.status }) }).catch(() => { }); }
-    else { saveNotes(); }
+    if (n.remote || n.synced) {
+      fetch(SYNC.url + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, status: n.status }) }).catch(() => { });
+    }
+    if (!n.remote) saveNotes();
     renderNotes();
   }
   else if (a === 'del') { if (confirm('删除这条批注？')) { notes.splice(notes.indexOf(n), 1); saveNotes(); renderNotes(); } }
