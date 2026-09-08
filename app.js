@@ -30,13 +30,13 @@ const perspCam = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.25,
 perspCam.position.set(21, 17, 30);
 
 const orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
-orthoCam.position.set(5.2, 80, 9.7);
+orthoCam.position.set(5.95, 80, 9.35);
 orthoCam.up.set(0, 0, -1);
 orthoCam.lookAt(5.2, 0, 9.7);
 
 let activeCam = perspCam;
 const controls = new OrbitControls(perspCam, renderer.domElement);
-controls.target.set(5.3, 0.6, 9.5);
+controls.target.set(5.95, 0.6, 9.35);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxDistance = 120;
@@ -619,11 +619,11 @@ const ground = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xcac2ae, roughness: 1 })
 );
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(5.3, -0.6, 9.95);
+ground.position.set(5.95, -0.6, 9.35);
 ground.receiveShadow = true;
 scene.add(ground);
 const grid = new THREE.GridHelper(120, 30, 0xb4ac96, 0xbfb8a4);
-grid.position.set(5.3, -0.58, 9.95);
+grid.position.set(5.95, -0.58, 9.35);
 grid.material.opacity = 0.22; grid.material.transparent = true;
 scene.add(grid);
 
@@ -705,7 +705,7 @@ function switchFloor(id) {
   /* 太阳跟随标高（保证阴影相机覆盖当前层） */
   const z = F0.z;
   sun.position.set(26, z + 32, 10);
-  sun.target.position.set(5.3, z, 9.5);
+  sun.target.position.set(5.95, z, 9.35);
   sun.target.updateMatrixWorld();
   sunFill.position.set(-18, z + 14, -22);
   /* 相机 */
@@ -905,7 +905,7 @@ function fitOrtho() {
   const S = 26.5;
   orthoCam.left = -S * aspect / 2; orthoCam.right = S * aspect / 2;
   orthoCam.top = S / 2; orthoCam.bottom = -S / 2;
-  orthoCam.position.set(5.2, 80, 9.7);
+  orthoCam.position.set(5.95, 80, 9.35);
   orthoCam.updateProjectionMatrix();
 }
 function w2s(x, z) {
@@ -1130,7 +1130,7 @@ function togglePlan(v) {
     controls.object = orthoCam;
     controls.enableRotate = false;
     controls.target.set(5.2, 0, 9.7);
-    orthoCam.position.set(5.2, 80, 9.7);
+    orthoCam.position.set(5.95, 80, 9.35);
     orthoCam.zoom = 1;
     orthoCam.updateProjectionMatrix();
     controls.update();
