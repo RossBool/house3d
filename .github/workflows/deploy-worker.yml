@@ -1,0 +1,42 @@
+name: 部署批注代理 Worker
+
+# 触发：worker/ 目录有改动时自动部署；也可在 Actions 页面手动点 Run workflow
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 部署到 Cloudflare Workers（并注入密钥）
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          secrets: |
+            FEISHU_APP_ID
+            FEISHU_APP_SECRET
+            BITABLE_APP_TOKEN
+            TABLE_ID
+            ALLOW_ORIGIN
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          BITABLE_APP_TOKEN: ${{ secrets.BITABLE_APP_TOKEN }}
+          TABLE_ID: ${{ secrets.TABLE_ID }}
+          ALLOW_ORIGIN: https://rossbool.github.io
+
+      - name: 部署结果提示
+        run: |
+          echo "✅ Worker 已部署"
+          echo "自检地址： https://house3d-note-proxy.<你的账户子域>.workers.dev/health"
+          echo "（子域在 Cloudflare 控制台 Workers & Pages 页面右侧可见）"
