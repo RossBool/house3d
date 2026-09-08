@@ -1691,14 +1691,21 @@ addEventListener('pointerup', e => {
   const c0 = [r.x + r.w / 2, r.y + r.h / 2];
   const pc = anchorHit(c0[0], c0[1]);
   if (!pc) return;
-  const p1 = anchorHit(r.x, r.y);
-  const p2 = anchorHit(r.x + r.w, r.y + r.h);
-  const w = p1 && p2 ? Math.abs(p2.x - p1.x) : 0;
-  const h2 = p1 && p2 ? Math.abs(p2.z - p1.z) : 0;
+  /* 尺寸用「中心所在平面」统一投影四角（避免天空角混入导致尺寸失真） */
+  const planeY = pc.y > activeFloor().data.z - 0.5 ? activeFloor().data.z + 0.01 : -0.6;
+  const corners = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]]
+    .map(([px, py]) => planeHit(px, py, planeY)).filter(Boolean);
+  let region = null;
+  if (corners.length >= 2) {
+    const xs = corners.map(p => p.x), zs = corners.map(p => p.z);
+    const w = Math.max(...xs) - Math.min(...xs), hh = Math.max(...zs) - Math.min(...zs);
+    if (w > 0.05 && hh > 0.05) region = { w, h: hh };
+  }
   openComposerAt({
-    obj: '区域批注', kind: '区域',
+    obj: region ? '区域批注' : '自由位置',
+    kind: region ? '区域' : '任意位置',
     coords: [+pc.x.toFixed(2), +pc.z.toFixed(2)],
-    region: { w: Math.max(w, 0.1), h: Math.max(h2, 0.1) },
+    region,
   });
 }, true);
 
