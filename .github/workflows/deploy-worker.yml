@@ -28,12 +28,17 @@ jobs:
             BITABLE_APP_TOKEN
             TABLE_ID
             ALLOW_ORIGIN
+            GITHUB_TOKEN
+            GITHUB_REPO
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           BITABLE_APP_TOKEN: ${{ secrets.BITABLE_APP_TOKEN }}
           TABLE_ID: ${{ secrets.TABLE_ID }}
           ALLOW_ORIGIN: https://rossbool.github.io
+          # 配了 GITHUB_TOKEN 才会同步 GitHub Issues（未配置时留空即可，Worker 自动跳过）
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES_TOKEN }}
+          GITHUB_REPO: RossBool/house3d
 
       - name: 部署结果提示
         run: |
