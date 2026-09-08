@@ -182,14 +182,14 @@
   /* ---- 移动端：底部导航 + 底部弹层 ---- */
   /* ---------- 批注模式 ---------- */
   #btnReview.on{background:var(--ink);color:#f6f2e9;border-color:var(--ink)}
-  #notePanel{position:fixed;right:16px;bottom:16px;width:330px;max-height:58vh;display:none;flex-direction:column;z-index:24;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 12px 34px rgba(30,25,15,.18);overflow:hidden}
+  #notePanel{position:fixed;left:16px;right:104px;bottom:16px;height:222px;display:none;flex-direction:column;z-index:24;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 12px 34px rgba(30,25,15,.18);overflow:hidden}
   #notePanel.open{display:flex}
   #notePanel header{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12px;letter-spacing:.06em;color:var(--ink2)}
   #notePanel header b{color:var(--ink);font-size:13px;letter-spacing:.1em}
   #noteClose{margin-left:auto;border:none;background:transparent;font-size:17px;line-height:1;cursor:pointer;color:var(--ink2)}
-  #noteList{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
-  .note-empty{color:var(--ink2);opacity:.65;font-size:12px;padding:10px 6px;line-height:1.7}
-  .note-card{border:1px solid var(--line);border-radius:4px;padding:8px;font-size:12px;background:rgba(255,255,255,.55)}
+  #noteList{flex:1;min-height:0;padding:8px;display:flex;flex-direction:row;gap:8px;overflow-x:auto;overflow-y:hidden}
+  .note-empty{flex:1;color:var(--ink2);opacity:.65;font-size:12px;padding:10px 6px;line-height:1.7}
+  .note-card{flex:0 0 300px;max-height:100%;overflow-y:auto;border:1px solid var(--line);border-radius:4px;padding:8px;font-size:12px;background:rgba(255,255,255,.55)}
   .note-card .nc-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
   .note-card .nc-floor{color:var(--ink2);opacity:.85}
   .note-card .nc-cat{background:var(--ink);color:#f6f2e9;border-radius:3px;padding:1px 6px;font-size:11px}
@@ -204,7 +204,6 @@
   #noteActions button{flex:1;font-family:inherit;font-size:11px;padding:6px 2px;border:1px solid var(--line);background:transparent;border-radius:3px;cursor:pointer;color:var(--ink2)}
   #marquee{position:fixed;border:1.5px dashed #b5442d;background:rgba(181,68,45,.08);pointer-events:none;display:none;z-index:26;border-radius:2px}
   #marquee.on{display:block}
-  body.notes-open #floorStrip{right:362px}
   #noteComposer{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,400px);display:none;flex-direction:column;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 18px 50px rgba(30,25,15,.3);padding:14px}
   #noteComposer.open{display:flex}
   #ncTitle{font-size:13px;color:var(--ink);margin-bottom:9px;line-height:1.55}
@@ -220,7 +219,9 @@
   #ncActions button{flex:1;font-family:inherit;font-size:12px;padding:8px;border-radius:4px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink2)}
   #ncSave{background:var(--ink);color:#f6f2e9;border-color:var(--ink)}
   @media (max-width:860px){
-    #notePanel{left:8px;right:8px;bottom:8px;width:auto;max-height:42vh}
+    #notePanel{left:8px;right:8px;bottom:8px;height:auto;max-height:42vh}
+    #noteList{flex-direction:column;overflow-x:hidden;overflow-y:auto}
+    .note-card{flex:0 0 auto;max-height:none;overflow:visible}
     #noteComposer{width:92vw;padding:12px}
   }
   @media (max-width:860px){
@@ -342,9 +343,9 @@
 </div>
 <div id="hint">左键拖拽旋转 · 滚轮缩放 · <b>点击房间/家具</b>查看讲解 · <b>VR 漫游</b>：拖拽环视/点地行走 · <b>右侧切换楼层</b> · 快捷键 <b>1/2/3</b> 材质 <b>N</b> 昼夜 <b>F</b> 家具 <b>P</b> 平面图 <b>R</b> 复位</div>
 
-<script src="./data.js?v=35"></script>
+<script src="./data.js?v=36"></script>
 <script type="importmap">{ "imports": { "three": "./libs/three.module.js" } }</script>
-<script type="module" src="./app.js?v=35"></script>
+<script type="module" src="./app.js?v=36"></script>
 <script>
   window.__errs = [];
   window.addEventListener('error', e => window.__errs.push(e.message + ' @' + (e.filename||'') + ':' + e.lineno));
