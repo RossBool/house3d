@@ -879,6 +879,7 @@ renderer.domElement.addEventListener('click', e => {
   }
   const o = pickAt(e.clientX, e.clientY);
   if (reviewMode) {
+    if (o && o.userData.pick === 'note') { highlightNote(o.userData.noteId); return; }
     if (o) { openComposer(o); return; }
     /* 没点到已命名对象 → 落在楼板/场地上也能批注（任意位置） */
     const p = anchorHit(e.clientX, e.clientY);
@@ -1582,6 +1583,11 @@ window.__snap = () => {
 window.__step = (n = 1) => {
   for (let i = 0; i < n; i++) {
     tickFly();
+    if (pulse) {
+      const g = pinMap[pulse.id];
+      if (g) { const k = 1 + 0.35 * Math.abs(Math.sin(performance.now() * 0.006)); g.scale.set(k, k, k); }
+      if (beamMesh && beamMesh.visible) beamMesh.material.opacity = 0.35 + 0.3 * Math.abs(Math.sin(performance.now() * 0.006));
+    }
     controls.update();
     if (vr.on) applyLook();
     renderer.render(scene, activeCam);
@@ -1737,26 +1743,65 @@ addEventListener('pointerup', e => {
   });
 }, true);
 
+/* 批注编号：按楼层内的时间顺序编号，模型标记与列表卡片共用同一编号 */
+function noteSeq() {
+  const map = {}, cnt = {};
+  allNotes().slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts))).forEach(x => {
+    const f = x.floor || (FLOORS.find(k => k.name === x.floorName) || {}).id || '?';
+    cnt[f] = (cnt[f] || 0) + 1;
+    map[x.id] = cnt[f];
+  });
+  return map;
+}
+let seqMap = {};
+function numSprite(txt, color) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.beginPath(); x.arc(64, 64, 56, 0, 7);
+  x.fillStyle = '#' + color.toString(16).padStart(6, '0'); x.fill();
+  x.lineWidth = 7; x.strokeStyle = 'rgba(255,255,255,.95)'; x.stroke();
+  x.fillStyle = '#fff'; x.font = 'bold 66px -apple-system,Helvetica,sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(txt, 64, 70);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false, transparent: true }));
+  sp.scale.set(0.66, 0.66, 1);
+  return sp;
+}
 /* 批注三维标记针（仅批注模式下显示，颜色区分状态） */
 let notePins = null;
+const pinMap = {};        // noteId -> pin group
+let pulse = null;         // 定位高亮 { id, t0 }
 function rebuildPins() {
   if (!notePins) { notePins = new THREE.Group(); scene.add(notePins); }
   notePins.clear();
   if (!reviewMode) { notePins.visible = false; return; }
   notePins.visible = true;
   const z = activeFloor().data.z;
+  Object.keys(pinMap).forEach(k => delete pinMap[k]);
+  const floorPickables = activeFloor().pickables;
+  for (let i = floorPickables.length - 1; i >= 0; i--) {
+    if (floorPickables[i].userData && floorPickables[i].userData.pick === 'note') floorPickables.splice(i, 1);
+  }
   allNotes().filter(x => {
     const fid = x.floor || (FLOORS.find(f => f.name === x.floorName) || {}).id;
     return fid === activeId;
   }).forEach(x => {
-    const mat = new THREE.MeshBasicMaterial({ color: x.status === '已改' ? 0x2e7d4f : 0xb5442d });
+    const color = x.status === '已改' ? 0x2e7d4f : 0xb5442d;
+    const mat = new THREE.MeshBasicMaterial({ color });
+    const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.04, 20), mat);
     base.position.set(x.coords[0], z + 0.03, x.coords[1]);
     const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.5, 10), mat);
     stick.position.set(x.coords[0], z + 0.78, x.coords[1]);
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.19, 14, 12), mat);
     ball.position.set(x.coords[0], z + 1.62, x.coords[1]);
-    notePins.add(base, stick, ball);
+    g.add(base, stick, ball);
+    const num = seqMap[x.id];
+    if (num) { const sp = numSprite(String(num), color); sp.position.set(x.coords[0], z + 2.15, x.coords[1]); g.add(sp); }
+    g.userData = { pick: 'note', noteId: x.id, floorId: activeId };
+    notePins.add(g);
+    pinMap[x.id] = g;
+    floorPickables.push(g);              // 点模型上的标记可直接跳到对应卡片
   });
 }
 window.__rebuildPins = rebuildPins;
@@ -1836,10 +1881,11 @@ function renderNotes() {
     list.innerHTML = '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>，或点击任意空处标注<b>自由位置</b>；按住 <b>Shift 拖拽</b>可框选一块区域批注。意见自动带楼层、坐标与当前视角。</div>';
     return;
   }
+  seqMap = noteSeq();
   rebuildPins();
   list.innerHTML = all.map(n => `
     <div class="note-card ${n.status === '已改' ? 'done' : ''}" data-id="${n.id}">
-      <div class="nc-h"><span class="nc-floor">${n.floorName || n.floor}</span><span class="nc-cat">${n.cat}</span><span class="nc-obj">${n.obj}</span>${n.remote ? '<span class="nc-floor">☁ 他人</span>' : (n.synced ? '<span class="nc-floor">✓ 已同步</span>' : (SYNC.url ? '<span class="nc-floor">… 待同步</span>' : ''))}</div>
+      <div class="nc-h"><span class="nc-obj">#${seqMap[n.id] || '?'}</span><span class="nc-floor">${n.floorName || n.floor}</span><span class="nc-cat">${n.cat}</span><span class="nc-obj">${n.obj}</span>${n.remote ? '<span class="nc-floor">☁ 他人</span>' : (n.synced ? '<span class="nc-floor">✓ 已同步</span>' : (SYNC.url ? '<span class="nc-floor">… 待同步</span>' : ''))}</div>
       <div class="nc-txt">${n.text.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</div>
       <div class="nc-meta">${n.author} · ${n.ts} · x${n.coords[0]} y${n.coords[1]}</div>
       <div class="nc-acts">
@@ -1855,12 +1901,37 @@ function noteCardText(n) {
   const cam = n.cam ? `　视角：(${n.cam.p.join(',')}) → (${n.cam.t.join(',')})` : '';
   return `【批注】${n.floorName} · ${n.obj}（${n.kind}）${rg}\n类别：${n.cat}\n问题：${n.text}\n位置：x${n.coords[0]} y${n.coords[1]}${cam}\n提出：${n.author} ${n.ts}`;
 }
+let beamMesh = null;
 function goToNote(n) {
   const F0 = FLOORS.find(f => f.name === n.floorName) || FLOORS.find(f => f.id === n.floor);
   if (F0 && F0.id !== activeId) switchFloor(F0.id);
-  if (n.cam) { flyTo(new THREE.Vector3(...n.cam.p), new THREE.Vector3(...n.cam.t), 1.2); return; }
-  const z = F0 ? F0.z : 0;
-  flyTo(new THREE.Vector3(n.coords[0] + 3.2, z + 3.6, n.coords[1] + 3.2), new THREE.Vector3(n.coords[0], z + 1, n.coords[1]), 1.2);
+  if (n.cam) flyTo(new THREE.Vector3(...n.cam.p), new THREE.Vector3(...n.cam.t), 1.2);
+  else {
+    const z = F0 ? F0.z : 0;
+    flyTo(new THREE.Vector3(n.coords[0] + 3.2, z + 3.6, n.coords[1] + 3.2), new THREE.Vector3(n.coords[0], z + 1, n.coords[1]), 1.2);
+  }
+  highlightNote(n.id);
+}
+/* 定位高亮：标记针脉动放大 + 竖一束光柱，明确指认是哪一条 */
+function highlightNote(id) {
+  pulse = { id, t0: performance.now() };
+  const n = allNotes().find(x => x.id === id);
+  const F0 = n && (FLOORS.find(f => f.name === n.floorName) || FLOORS.find(f => f.id === n.floor));
+  if (!n || !F0) return;
+  if (!beamMesh) {
+    beamMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.16, 1, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })
+    );
+    scene.add(beamMesh);
+  }
+  beamMesh.position.set(n.coords[0], F0.z + 1.6, n.coords[1]);
+  beamMesh.scale.set(1, 3.2, 1);
+  beamMesh.visible = true;
+  setTimeout(() => { beamMesh.visible = false; pulse = null; const g = pinMap[id]; if (g) g.scale.set(1, 1, 1); }, 4200);
+  // 列表卡片滚动到可视区并闪烁
+  const card = [...document.querySelectorAll('.note-card')].find(c => c.dataset.id === id);
+  if (card) { card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); card.style.transition = 'background .2s'; card.style.background = 'rgba(255,176,32,.25)'; setTimeout(() => { card.style.background = ''; }, 1600); }
 }
 function exportNotes() {
   const blob = new Blob([JSON.stringify({ project: META.project, exported: new Date().toISOString(), notes: allNotes() }, null, 2)], { type: 'application/json' });
