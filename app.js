@@ -1606,6 +1606,7 @@ if (!SYNC.url) {
     .catch(() => { });
 }
 const notes = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || '[]'); } catch (e) { return []; } })();
+notes.forEach(x => { if (x.synced && x.imgHD) delete x.imgHD; });
 function saveNotes() { try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) { } }
 function noteAuthor() {
   const el = $('#ncAuthor');
@@ -1613,13 +1614,14 @@ function noteAuthor() {
   try { localStorage.setItem('house3d-author', a); } catch (e) { }
   return a;
 }
-function thumb() {
-  /* 320×200 缩略图，控制 localStorage 体积 */
+function thumb(maxW, q) {
+  /* 按画布真实宽高比缩放（原实现固定 320×200 会拉伸变形） */
   const cv = renderer.domElement;
-  const c = document.createElement('canvas'); c.width = 320; c.height = 200;
-  const x = c.getContext('2d');
-  x.drawImage(cv, 0, 0, 320, 200);
-  return c.toDataURL('image/jpeg', 0.55);
+  const ar = cv.width / cv.height;
+  const w = maxW, h = Math.max(2, Math.round(maxW / ar));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').drawImage(cv, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', q);
 }
 function openComposer(o) {
   const ud = o.userData;
@@ -1639,7 +1641,8 @@ function openComposerAt({ obj, kind, coords, region }) {
     floor: F0.id, floorName: F0.name, obj, kind,
     coords, region: region || null,
     cam: { p: perspCam.position.toArray().map(v => +v.toFixed(2)), t: controls.target.toArray().map(v => +v.toFixed(2)) },
-    img: thumb(),
+    img: thumb(560, 0.7),                                  // 本地：列表/导出用，控制 localStorage 体积
+    imgHD: SYNC.url ? thumb(1400, 0.85) : null,            // 云端：飞书附件用高清图
   };
   $('#ncTitle').innerHTML = `批注：<b>${obj}</b>${rTxt} <span style="color:var(--ink2);font-size:12px">（${kind} · ${F0.name} · x${coords[0]} y${coords[1]}）</span>`;
   $('#ncCats').innerHTML = NOTE_CATS.map(c => `<button data-c="${c}" class="${c === pendingCat ? 'on' : ''}">${c}</button>`).join('');
@@ -1783,9 +1786,12 @@ function allNotes() {
 async function pushNote(n) {
   if (!SYNC.url || !n) return;
   try {
-    const r = await fetch(SYNC.url + '/note', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(n) });
+    const payload = { ...n, img: n.imgHD || n.img };
+    delete payload.imgHD;
+    const r = await fetch(SYNC.url + '/note', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const j = await r.json();
     n.synced = !!(j.code === 0 || j.ok);
+    if (n.synced) delete n.imgHD;                           // 已上传 → 释放本地内存
     syncState = n.synced ? 'online' : 'error';
   } catch (e) { n.synced = false; syncState = 'error'; }
   saveNotes(); renderNotes();
