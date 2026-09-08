@@ -1,4 +1,4 @@
 {
-  "url": "",
-  "_说明": "填入批注代理地址（如 https://house3d-note-proxy.xxx.workers.dev）。留空 = 纯本地批注模式。"
+  "url": "https://house3d-note-proxy.1051447847.workers.dev",
+  "_说明": "批注同步代理地址（飞书多维表格）。留空则回到纯本地批注模式。"
 }
