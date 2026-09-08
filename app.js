@@ -121,7 +121,7 @@ const TYPE_NAME = {
   toilet: '坐便器', basin: '台盆', diningSet: '餐桌椅', sideboard: '餐边柜', plant: '绿植',
   kitchenCounter: '橱柜', fridge: '冰箱', laundry: '洗衣机组', sink: '水槽', sofa3: '三人沙发',
   sofa1: '单人沙发', coffeeTable: '茶几', tvUnit: '电视柜', lSofa: '曲尺沙发', teaTable: '茶桌',
-  shelf: '博古架', desk: '书桌', chair: '座椅', bookshelf: '书架', armchair: '单人沙发',
+  shelf: '博古架', table4: '餐桌（4 座）', desk: '书桌', chair: '座椅', bookshelf: '书架', armchair: '单人沙发',
   console: '条案', flowerPool: '花池', outdoorSet: '户外桌椅', lounger: '躺椅', liftCar: '电梯',
 };
 
@@ -420,6 +420,22 @@ const F = {
     fb(g, 1.7, 0.4, 0.7, MAT.fabric, 0.75, 0.1, -1.25, 0, true);
     fb(g, 1.7, 0.95, 0.25, MAT.fabric, 0.75, 0, -1.52, 0, true);
     for (let i = 0; i < 3; i++) fb(g, 0.2, 0.42, 0.75, MAT.fabric, -0.12, 0.5, -1.0 + i * 0.85);
+  },
+  table4(g) {
+    /* 小方餐桌：图纸标准层/两房一厅餐厅为 0.8×1.0 小桌 + 两侧各两椅 */
+    fb(g, 1.0, 0.05, 0.8, MAT.wood, 0, 0.72, 0, 0, true);
+    fb(g, 0.06, 0.72, 0.72, MAT.woodDark, -0.44, 0, 0);
+    fb(g, 0.06, 0.72, 0.72, MAT.woodDark, 0.44, 0, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const cg = new THREE.Group();
+      cg.position.set(sx * 0.72, 0, sz * 0.32);
+      cg.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2;
+      fb(cg, 0.42, 0.05, 0.42, MAT.wood, 0, 0.44, 0);
+      fb(cg, 0.42, 0.48, 0.05, MAT.wood, 0, 0.49, -0.19);
+      [[-0.17, -0.17], [0.17, -0.17], [-0.17, 0.17], [0.17, 0.17]].forEach(([lx, lz]) =>
+        cyl(cg, 0.017, 0.44, MAT.woodDark, lx, 0, lz, 8));
+      g.add(cg);
+    }
   },
   teaTable(g) {
     fb(g, 1.5, 0.06, 0.9, MAT.woodDark, 0, 0.3, 0, 0, true);
