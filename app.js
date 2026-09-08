@@ -441,32 +441,71 @@ const F = {
     }
   },
   car(g) {
-    /* 轿车：长轴沿 X，四轮轴沿 Z —— 车身/腰线/座舱/前后挡/侧窗/轮拱/车轮/后视镜/灯组 */
+    /* 三种车型：sedan 轿车 / suv 越野车 / mpv 商务车（长轴沿 X，四轮轴沿 Z）
+       userData.carType 指定车型，carRed 指定配色 */
+    const type = (g.userData && g.userData.carType) || 'sedan';
     const paint = (g.userData && g.userData.carRed) ? MAT.carBody2 : MAT.carBody;
     const glass = MAT.carGlass, dark = MAT.black;
-    fb(g, 4.5, 0.34, 1.82, paint, 0, 0.30, 0, 0, true);          // 车身下段
-    fb(g, 4.3, 0.26, 1.78, paint, -0.05, 0.64, 0);               // 腰线
-    fb(g, 1.55, 0.06, 1.6, paint, -0.05, 0.90, 0);               // 车顶
-    fb(g, 1.75, 0.44, 1.62, paint, -0.15, 0.90, 0, 0, true);     // 座舱框架
-    const ws = fb(g, 0.05, 0.52, 1.56, glass, -1.16, 0.86, 0); ws.rotation.z = -0.62;  // 前挡
-    const rw = fb(g, 0.05, 0.46, 1.56, glass, 0.82, 0.88, 0); rw.rotation.z = 0.66;    // 后挡
-    fb(g, 1.5, 0.3, 1.66, glass, -0.1, 0.94, 0);                 // 侧窗带
-    fb(g, 0.85, 0.22, 1.72, paint, 1.55, 0.66, 0);               // 引擎盖
-    fb(g, 0.7, 0.2, 1.72, paint, -1.72, 0.66, 0);                // 尾箱盖
-    for (const wx of [-1.42, 1.42]) fb(g, 0.98, 0.34, 1.86, dark, wx, 0.24, 0);  // 轮拱
-    for (const [wx, wz] of [[-1.42, 0.85], [1.42, 0.85], [-1.42, -0.85], [1.42, -0.85]]) {
-      const tyre = cyl(g, 0.33, 0.24, dark, wx, 0.18, wz, 16);
+    const wheel = (wx, wz, r) => {
+      const tyre = cyl(g, r, 0.26, dark, wx, r - 0.12, wz, 16);
       tyre.rotation.x = Math.PI / 2;
-      const rim = cyl(g, 0.17, 0.26, MAT.steel, wx, 0.18, wz, 12);
+      const rim = cyl(g, r * 0.52, 0.28, MAT.steel, wx, r - 0.12, wz, 12);
       rim.rotation.x = Math.PI / 2;
+    };
+    const lights = (hx, hy, tailH) => {
+      fb(g, 0.06, hy, 0.44, MAT.lamp, hx, 0.58, 0.55);
+      fb(g, 0.06, hy, 0.44, MAT.lamp, hx, 0.58, -0.55);
+      fb(g, 0.06, tailH, 0.4, dark, -hx, 0.6, 0.55);
+      fb(g, 0.06, tailH, 0.4, dark, -hx, 0.6, -0.55);
+      fb(g, 0.03, 0.13, 0.36, MAT.white, hx + 0.02, 0.44, 0);
+    };
+    if (type === 'suv') {
+      /* SUV：车身更高、方头方尾、车顶行李架、大轮 */
+      fb(g, 4.6, 0.52, 1.88, paint, 0, 0.42, 0, 0, true);
+      fb(g, 4.45, 0.3, 1.86, paint, -0.05, 0.94, 0);
+      fb(g, 2.3, 0.06, 1.72, paint, -0.2, 1.28, 0);
+      fb(g, 2.35, 0.5, 1.76, paint, -0.2, 1.28, 0, 0, true);
+      const ws = fb(g, 0.05, 0.6, 1.7, glass, -1.32, 1.22, 0); ws.rotation.z = -0.42;
+      const rw = fb(g, 0.05, 0.56, 1.7, glass, 0.92, 1.24, 0); rw.rotation.z = 0.28;
+      fb(g, 1.9, 0.36, 1.8, glass, -0.15, 1.28, 0);
+      fb(g, 0.8, 0.28, 1.82, paint, 1.72, 0.9, 0);
+      fb(g, 0.5, 0.3, 1.84, paint, -1.85, 0.92, 0);
+      for (const rz of [0.72, -0.72]) fb(g, 1.9, 0.05, 0.09, dark, -0.2, 1.34, rz);
+      for (const wx of [-1.45, 1.45]) fb(g, 1.0, 0.4, 1.92, dark, wx, 0.3, 0);
+      wheel(-1.45, 0.88, 0.38); wheel(1.45, 0.88, 0.38); wheel(-1.45, -0.88, 0.38); wheel(1.45, -0.88, 0.38);
+      for (const mz of [1.0, -1.0]) fb(g, 0.15, 0.08, 0.17, paint, -1.1, 1.32, mz);
+      lights(2.28, 0.18, 0.16);
+    } else if (type === 'mpv') {
+      /* 商务车：更长更高、大侧窗、侧滑门缝 */
+      fb(g, 4.95, 0.56, 1.9, paint, 0, 0.42, 0, 0, true);
+      fb(g, 4.8, 0.32, 1.88, paint, -0.05, 0.98, 0);
+      fb(g, 3.1, 0.06, 1.76, paint, -0.35, 1.42, 0);
+      fb(g, 3.15, 0.56, 1.8, paint, -0.35, 1.42, 0, 0, true);
+      const ws = fb(g, 0.05, 0.66, 1.74, glass, -1.85, 1.34, 0); ws.rotation.z = -0.55;
+      const rw = fb(g, 0.05, 0.6, 1.74, glass, 1.25, 1.36, 0); rw.rotation.z = 0.16;
+      fb(g, 2.75, 0.4, 1.84, glass, -0.35, 1.42, 0);
+      fb(g, 0.55, 0.3, 1.84, paint, 2.0, 0.94, 0);
+      fb(g, 0.06, 0.5, 1.86, dark, 0.15, 1.0, 0);
+      for (const wx of [-1.55, 1.55]) fb(g, 1.05, 0.42, 1.94, dark, wx, 0.3, 0);
+      wheel(-1.55, 0.9, 0.36); wheel(1.55, 0.9, 0.36); wheel(-1.55, -0.9, 0.36); wheel(1.55, -0.9, 0.36);
+      for (const mz of [1.02, -1.02]) fb(g, 0.15, 0.08, 0.18, paint, -1.7, 1.46, mz);
+      lights(2.45, 0.16, 0.18);
+    } else {
+      /* 轿车（默认） */
+      fb(g, 4.5, 0.34, 1.82, paint, 0, 0.30, 0, 0, true);
+      fb(g, 4.3, 0.26, 1.78, paint, -0.05, 0.64, 0);
+      fb(g, 1.55, 0.06, 1.6, paint, -0.05, 0.90, 0);
+      fb(g, 1.75, 0.44, 1.62, paint, -0.15, 0.90, 0, 0, true);
+      const ws = fb(g, 0.05, 0.52, 1.56, glass, -1.16, 0.86, 0); ws.rotation.z = -0.62;
+      const rw = fb(g, 0.05, 0.46, 1.56, glass, 0.82, 0.88, 0); rw.rotation.z = 0.66;
+      fb(g, 1.5, 0.3, 1.66, glass, -0.1, 0.94, 0);
+      fb(g, 0.85, 0.22, 1.72, paint, 1.55, 0.66, 0);
+      fb(g, 0.7, 0.2, 1.72, paint, -1.72, 0.66, 0);
+      for (const wx of [-1.42, 1.42]) fb(g, 0.98, 0.34, 1.86, dark, wx, 0.24, 0);
+      wheel(-1.42, 0.85, 0.33); wheel(1.42, 0.85, 0.33); wheel(-1.42, -0.85, 0.33); wheel(1.42, -0.85, 0.33);
+      for (const mz of [0.95, -0.95]) fb(g, 0.14, 0.07, 0.16, paint, -1.05, 1.02, mz);
+      lights(2.24, 0.16, 0.14);
     }
-    for (const mz of [0.95, -0.95]) fb(g, 0.14, 0.07, 0.16, paint, -1.05, 1.02, mz);  // 后视镜
-    fb(g, 0.06, 0.16, 0.44, MAT.lamp, -2.24, 0.58, 0.52);        // 前灯
-    fb(g, 0.06, 0.16, 0.44, MAT.lamp, -2.24, 0.58, -0.52);
-    fb(g, 0.06, 0.14, 0.4, MAT.black, 2.24, 0.6, 0.52);          // 尾灯
-    fb(g, 0.06, 0.14, 0.4, MAT.black, 2.24, 0.6, -0.52);
-    fb(g, 0.03, 0.13, 0.36, MAT.white, -2.26, 0.44, 0);          // 前车牌
-    fb(g, 0.03, 0.13, 0.36, MAT.white, 2.26, 0.44, 0);           // 后车牌
   },
   teaTable(g) {
     fb(g, 1.5, 0.06, 0.9, MAT.woodDark, 0, 0.3, 0, 0, true);
@@ -656,7 +695,7 @@ FLOORS.forEach(F0 => {
     g.position.set(f.pos[0], 0, f.pos[1]);
     g.rotation.y = f.rot || 0;
     if (f.s) g.scale.set(f.s, f.s, f.s);
-    g.userData = { pick: 'furn', floorId: F0.id, typeKey: f.type, name: f.name || TYPE_NAME[f.type] || f.type, desc: f.desc || '', room: f.room || '', carRed: !!f.carRed };
+    g.userData = { pick: 'furn', floorId: F0.id, typeKey: f.type, name: f.name || TYPE_NAME[f.type] || f.type, desc: f.desc || '', room: f.room || '', carRed: !!f.carRed, carType: f.carType || 'sedan' };
     furn.add(g);
     pickables.push(g);
     F[f.type] && F[f.type](g);
