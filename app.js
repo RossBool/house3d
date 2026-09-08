@@ -736,6 +736,7 @@ function setNight(v) {
 
 function switchFloor(id) {
   activeId = id;
+  if (window.__rebuildPins) window.__rebuildPins();
   const F0 = activeFloor().data;
   for (const k in floorObjs) {
     floorObjs[k].group.visible = (k === id);
@@ -866,8 +867,13 @@ renderer.domElement.addEventListener('click', e => {
   }
   const o = pickAt(e.clientX, e.clientY);
   if (reviewMode) {
-    if (!o) { if (composerEmpty()) closeComposer(); return; }
-    openComposer(o); return;
+    if (o) { openComposer(o); return; }
+    /* 没点到已命名对象 → 落在楼板/场地上也能批注（任意位置） */
+    const p = anchorHit(e.clientX, e.clientY);
+    if (p) {
+      openComposerAt({ obj: '自由位置', kind: '任意位置', coords: [+p.x.toFixed(2), +p.z.toFixed(2)] });
+    } else if (composerEmpty()) closeComposer();
+    return;
   }
   if (!o) return;
   if (o.userData.pick === 'room') {
@@ -1607,17 +1613,22 @@ function openComposer(o) {
   const isRoom = ud.pick === 'room';
   const name = isRoom ? ud.room.name : (ud.name || '构件');
   const kind = isRoom ? '房间' : (ud.pick === 'wall' ? '墙体' : (ud.typeKey || '家具'));
-  const F0 = activeFloor().data;
   let cx, cz;
   if (isRoom) { const b = ud.room.bbox; cx = (b[0] + b[2]) / 2; cz = (b[1] + b[3]) / 2; }
   else { const b = new THREE.Box3().setFromObject(o); cx = (b.min.x + b.max.x) / 2; cz = (b.min.z + b.max.z) / 2; }
+  openComposerAt({ obj: name, kind, coords: [+cx.toFixed(2), +cz.toFixed(2)] });
+}
+/* 任意位置 / 任意区域批注（不依赖是否点到已命名对象） */
+function openComposerAt({ obj, kind, coords, region }) {
+  const F0 = activeFloor().data;
+  const rTxt = region ? ` 区域 ${region.w.toFixed(1)}×${region.h.toFixed(1)}m` : '';
   pendingPick = {
-    floor: F0.id, floorName: F0.name, obj: name, kind,
-    coords: [+cx.toFixed(2), +cz.toFixed(2)],
+    floor: F0.id, floorName: F0.name, obj, kind,
+    coords, region: region || null,
     cam: { p: perspCam.position.toArray().map(v => +v.toFixed(2)), t: controls.target.toArray().map(v => +v.toFixed(2)) },
     img: thumb(),
   };
-  $('#ncTitle').innerHTML = `批注：<b>${name}</b> <span style="color:var(--ink2);font-size:12px">（${kind} · ${F0.name} · x${cx.toFixed(2)} y${cz.toFixed(2)}）</span>`;
+  $('#ncTitle').innerHTML = `批注：<b>${obj}</b>${rTxt} <span style="color:var(--ink2);font-size:12px">（${kind} · ${F0.name} · x${coords[0]} y${coords[1]}）</span>`;
   $('#ncCats').innerHTML = NOTE_CATS.map(c => `<button data-c="${c}" class="${c === pendingCat ? 'on' : ''}">${c}</button>`).join('');
   $('#ncText').value = '';
   try { $('#ncAuthor').value = localStorage.getItem('house3d-author') || ''; } catch (e) { }
@@ -1625,10 +1636,96 @@ function openComposer(o) {
   $('#ncText').focus();
 }
 function closeComposer() { $('#noteComposer').classList.remove('open'); pendingPick = null; }
+/* 批注锚点：先试当前楼层平面（仅当交点落在建筑轮廓内），否则落室外地面 */
+const ENVELOPE = { x1: -1.6, y1: -2.9, x2: 13.5, y2: 21.6 };
+function anchorHit(cx, cy) {
+  const z = activeFloor().data.z;
+  const p = planeHit(cx, cy, z + 0.01);
+  if (p && p.x > ENVELOPE.x1 && p.x < ENVELOPE.x2 && p.z > ENVELOPE.y1 && p.z < ENVELOPE.y2) return p;
+  const g = planeHit(cx, cy, -0.6);
+  if (g && Math.hypot(g.x - 5.95, g.z - 9.35) < 40) return g;
+  return null;
+}
+/* 屏幕坐标 → 指定水平面的世界交点（用于任意位置/区域批注锚点） */
+const _plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function planeHit(cx, cy, planeY) {
+  ptr.x = (cx / innerWidth) * 2 - 1;
+  ptr.y = -(cy / innerHeight) * 2 + 1;
+  ray.setFromCamera(ptr, activeCam);
+  _plane.constant = -planeY;
+  const p = new THREE.Vector3();
+  return ray.ray.intersectPlane(_plane, p) ? p : null;
+}
 function composerEmpty() {
   const el = $('#ncText');
   return !$('#noteComposer').classList.contains('open') || !el.value.trim();
 }
+/* Shift + 拖拽 = 框选任意一块区域批注（普通拖拽仍是旋转视角） */
+let mqStart = null;
+const mqEl = () => $('#marquee');
+function mqRect(a, b) {
+  return { x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) };
+}
+function mqShow(a, b) {
+  const r = mqRect(a, b); const el = mqEl();
+  el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
+  el.style.width = r.w + 'px'; el.style.height = r.h + 'px';
+  el.classList.add('on');
+}
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (!reviewMode || !e.shiftKey) return;
+  controls.enabled = false;                    // 拖拽期间不旋转视角
+  mqStart = [e.clientX, e.clientY];
+  mqShow(mqStart, mqStart);
+}, true);
+renderer.domElement.addEventListener('pointermove', e => {
+  if (mqStart) mqShow(mqStart, [e.clientX, e.clientY]);
+}, true);
+addEventListener('pointerup', e => {
+  if (!mqStart) return;
+  const a = mqStart; mqStart = null;
+  controls.enabled = true;
+  mqEl().classList.remove('on');
+  const r = mqRect(a, [e.clientX, e.clientY]);
+  if (r.w < 14 || r.h < 14) return;            // 视为点击，交给 click 处理
+  const c0 = [r.x + r.w / 2, r.y + r.h / 2];
+  const pc = anchorHit(c0[0], c0[1]);
+  if (!pc) return;
+  const p1 = anchorHit(r.x, r.y);
+  const p2 = anchorHit(r.x + r.w, r.y + r.h);
+  const w = p1 && p2 ? Math.abs(p2.x - p1.x) : 0;
+  const h2 = p1 && p2 ? Math.abs(p2.z - p1.z) : 0;
+  openComposerAt({
+    obj: '区域批注', kind: '区域',
+    coords: [+pc.x.toFixed(2), +pc.z.toFixed(2)],
+    region: { w: Math.max(w, 0.1), h: Math.max(h2, 0.1) },
+  });
+}, true);
+
+/* 批注三维标记针（仅批注模式下显示，颜色区分状态） */
+let notePins = null;
+function rebuildPins() {
+  if (!notePins) { notePins = new THREE.Group(); scene.add(notePins); }
+  notePins.clear();
+  if (!reviewMode) { notePins.visible = false; return; }
+  notePins.visible = true;
+  const z = activeFloor().data.z;
+  allNotes().filter(x => {
+    const fid = x.floor || (FLOORS.find(f => f.name === x.floorName) || {}).id;
+    return fid === activeId;
+  }).forEach(x => {
+    const mat = new THREE.MeshBasicMaterial({ color: x.status === '已改' ? 0x2e7d4f : 0xb5442d });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.04, 20), mat);
+    base.position.set(x.coords[0], z + 0.03, x.coords[1]);
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.5, 10), mat);
+    stick.position.set(x.coords[0], z + 0.78, x.coords[1]);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.19, 14, 12), mat);
+    ball.position.set(x.coords[0], z + 1.62, x.coords[1]);
+    notePins.add(base, stick, ball);
+  });
+}
+window.__rebuildPins = rebuildPins;
+
 /* 指针离开模型（画布）后，未输入的批注弹窗自动收起；正在输入或已写内容则保留，避免误关丢字 */
 let lastPtr = { x: -1, y: -1 };
 addEventListener('pointermove', e => { lastPtr = { x: e.clientX, y: e.clientY }; }, { passive: true });
@@ -1698,9 +1795,10 @@ function renderNotes() {
     ? `${all.length} 条 · 待处理 ${all.filter(x => x.status === '待处理').length}${others ? ' · 他人 ' + others : ''} · ${stateTxt}`
     : stateTxt;
   if (!all.length) {
-    list.innerHTML = '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>即可写下意见；意见自动带楼层、对象、坐标与当前视角。</div>';
+    list.innerHTML = '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>，或点击任意空处标注<b>自由位置</b>；按住 <b>Shift 拖拽</b>可框选一块区域批注。意见自动带楼层、坐标与当前视角。</div>';
     return;
   }
+  rebuildPins();
   list.innerHTML = all.map(n => `
     <div class="note-card ${n.status === '已改' ? 'done' : ''}" data-id="${n.id}">
       <div class="nc-h"><span class="nc-floor">${n.floorName || n.floor}</span><span class="nc-cat">${n.cat}</span><span class="nc-obj">${n.obj}</span>${n.remote ? '<span class="nc-floor">☁ 他人</span>' : (n.synced ? '<span class="nc-floor">✓ 已同步</span>' : (SYNC.url ? '<span class="nc-floor">… 待同步</span>' : ''))}</div>
@@ -1715,7 +1813,9 @@ function renderNotes() {
     </div>`).join('');
 }
 function noteCardText(n) {
-  return `【批注】${n.floorName} · ${n.obj}（${n.kind}）\n类别：${n.cat}\n问题：${n.text}\n位置：x${n.coords[0]} y${n.coords[1]}　视角：(${n.cam.p.join(',')}) → (${n.cam.t.join(',')})\n提出：${n.author} ${n.ts}`;
+  const rg = n.region ? ` 区域 ${n.region.w.toFixed(1)}×${n.region.h.toFixed(1)}m` : '';
+  const cam = n.cam ? `　视角：(${n.cam.p.join(',')}) → (${n.cam.t.join(',')})` : '';
+  return `【批注】${n.floorName} · ${n.obj}（${n.kind}）${rg}\n类别：${n.cat}\n问题：${n.text}\n位置：x${n.coords[0]} y${n.coords[1]}${cam}\n提出：${n.author} ${n.ts}`;
 }
 function goToNote(n) {
   const F0 = FLOORS.find(f => f.name === n.floorName) || FLOORS.find(f => f.id === n.floor);
@@ -1745,7 +1845,7 @@ function toggleReview() {
   reviewMode = !reviewMode;
   $('#btnReview').classList.toggle('on', reviewMode);
   renderer.domElement.style.cursor = reviewMode ? 'crosshair' : '';
-  if (reviewMode) { renderNotes(); $('#notePanel').classList.add('open'); startSync(); }
+  if (reviewMode) { renderNotes(); rebuildPins(); $('#notePanel').classList.add('open'); startSync(); }
   else { closeComposer(); $('#notePanel').classList.remove('open'); stopSync(); }
 }
 $('#btnReview').onclick = toggleReview;
