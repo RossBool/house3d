@@ -2023,6 +2023,38 @@ window.__perf = () => ({
   geoms: renderer.info.memory.geometries,
   programs: renderer.info.programs ? renderer.info.programs.length : 0,
 });
+/* 门口净空审计：家具覆盖门宽 ≥0.35m 且离墙面 ≤0.30m 判为"堵门" */
+window.__doorcheck = () => {
+  const ALONG_MIN = 0.35, PERP_MAX = 0.30;
+  const rows = [];
+  for (const id in floorObjs) {
+    const F = floorObjs[id];
+    for (const w of (F.data.walls || [])) {
+      const ax = w.a[0], ay = w.a[1], bx = w.b[0], by = w.b[1];
+      const L = Math.hypot(bx - ax, by - ay); if (L < 0.2) continue;
+      const ux = (bx - ax) / L, uy = (by - ay) / L, nx = -uy, ny = ux, halfT = (w.t || 0.2) / 2;
+      for (const op of (w.ops || [])) {
+        if (!['door', 'slide', 'pass', 'lift'].includes(op.type)) continue;
+        const o1 = op.o - op.w / 2, o2 = op.o + op.w / 2;
+        for (const g of F.furn.children) {
+          if (!g.userData.typeKey) continue;
+          const b = new THREE.Box3().setFromObject(g);
+          let a0 = 1e9, a1 = -1e9, p0 = 1e9, p1 = -1e9;
+          for (const [cx, cz] of [[b.min.x, b.min.z], [b.max.x, b.min.z], [b.min.x, b.max.z], [b.max.x, b.max.z]]) {
+            const al = (cx - ax) * ux + (cz - ay) * uy, pe = (cx - ax) * nx + (cz - ay) * ny;
+            a0 = Math.min(a0, al); a1 = Math.max(a1, al); p0 = Math.min(p0, pe); p1 = Math.max(p1, pe);
+          }
+          const along = Math.min(a1, o2) - Math.max(a0, o1);
+          const perp = Math.max(0, Math.max(p0, -p1) - halfT);
+          if (along >= ALONG_MIN && perp <= PERP_MAX) {
+            rows.push(`[${id}] 「${g.userData.name}」堵 ${w.name}/${op.code || op.type}（覆盖门宽 ${along.toFixed(2)}m，离墙 ${perp.toFixed(2)}m）`);
+          }
+        }
+      }
+    }
+  }
+  return rows.length ? rows : ['门口全部通畅 ✓'];
+};
 window.__auditHelper = { Box3: THREE.Box3, V3: THREE.Vector3 };
 window.__app.floorObjs = floorObjs;
 window.__app.decollideFloor = decollideFloor;
