@@ -1,0 +1,5 @@
+name = "house3d-note-proxy"
+main = "feishu-proxy.js"
+compatibility_date = "2025-01-01"
+# 部署后地址：https://house3d-note-proxy.<你的账户子域>.workers.dev
+# 密钥不写在文件里，由 GitHub Actions 通过 wrangler secret put 注入
