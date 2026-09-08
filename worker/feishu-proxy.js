@@ -140,13 +140,21 @@ export default {
           const ft = await uploadThumb(env, token, b.img, F(b.id));
           if (ft) fields['缩略图'] = [{ file_token: ft }];
         }
-        const r = await fetch(base, {
+        /* 按 批注ID 去重：已存在则更新（upsert），避免重复行 */
+        const q = await fetch(`${base}/search`, {
           method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filter: { conjunction: 'and', conditions: [{ field_name: '批注ID', operator: 'is', value: [b.id] }] } }),
+        });
+        const qj = await q.json();
+        const exist = qj?.data?.items?.[0];
+        const r = await fetch(exist ? `${base}/${exist.record_id}` : base, {
+          method: exist ? 'PUT' : 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ fields }),
         });
         const j = await r.json();
-        return json(env, j, j.code === 0 ? 200 : 400);
+        return json(env, { ...j, upsert: exist ? 'updated' : 'created' }, j.code === 0 ? 200 : 400);
       }
 
       if (url.pathname === '/status' && req.method === 'POST') {
