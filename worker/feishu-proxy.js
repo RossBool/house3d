@@ -283,6 +283,17 @@ export default {
             issue = await ghCreateIssue(env, b, imgUrl, verdict).catch(e => ({ error: String(e) }));
           } else {
             issue = { number: found.number, url: found.html_url, existed: true };
+            if (verdict && verdict.bad && found.state === 'open') {   // 已存在的单子若判为无效，也关掉
+              await ghApi(env, `/repos/${ghRepo(env)}/issues/${found.number}/comments`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body: `🤖 自动审查未通过：**${verdict.reason}**\n该批注不作为修改依据，已自动关闭。` }),
+              });
+              await ghApi(env, `/repos/${ghRepo(env)}/issues/${found.number}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state: 'closed', labels: ['批注', b.cat || '其他', '疑似无效'] }),
+              });
+              issue.closed = true;
+            }
           }
         }
         return json(env, { ...j, upsert: exist ? 'updated' : 'created', issue, verdict }, j.code === 0 ? 200 : 400);
