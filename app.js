@@ -1610,6 +1610,7 @@ const NOTE_CATS = ['位置', '朝向', '尺寸', '材质', '增删', '其他'];
    也可用 ?sync=https://xxx.workers.dev 临时指定（便于联调）。 */
 const SYNC = { url: new URLSearchParams(location.search).get('sync') || '', pollMs: 10000 };
 let remoteNotes = [], syncTimer = null, syncState = 'local';
+let showDone = false;      // 是否显示「已改」的记录（默认隐藏）
 /* 云端地址优先取 ?sync= 参数，其次读仓库根目录 sync.json（{"url":"https://..."}）
    —— 换后端只改 sync.json，无需改代码重新发布 */
 if (!SYNC.url) {
@@ -1787,7 +1788,7 @@ function rebuildPins() {
   for (let i = floorPickables.length - 1; i >= 0; i--) {
     if (floorPickables[i].userData && floorPickables[i].userData.pick === 'note') floorPickables.splice(i, 1);
   }
-  allNotes().filter(x => {
+  visibleNotes().filter(x => {
     const fid = x.floor || (FLOORS.find(f => f.name === x.floorName) || {}).id;
     return fid === activeId;
   }).forEach(x => {
@@ -1840,6 +1841,9 @@ function saveNote() {
   pushNote(notes[0]);
 }
 /* ---------- 云端同步 ---------- */
+function visibleNotes() {
+  return allNotes().filter(x => showDone || x.status !== '已改');
+}
 function allNotes() {
   const localIds = new Set(notes.map(x => x.id));
   return [...notes, ...remoteNotes.filter(r => !localIds.has(r.id))]
@@ -1876,14 +1880,17 @@ function startSync() {
 function stopSync() { if (syncTimer) { clearInterval(syncTimer); syncTimer = null; } }
 function renderNotes() {
   const list = $('#noteList');
-  const all = allNotes();
+  const all = visibleNotes();
+  const hidden = allNotes().filter(x => x.status === '已改').length;
   const others = all.filter(x => x.remote && !notes.some(l => l.id === x.id)).length;
   const stateTxt = !SYNC.url ? '本地模式' : (syncState === 'online' ? '云端已连接' : (syncState === 'error' ? '云端异常' : '连接中…'));
-  $('#noteCount').textContent = all.length
-    ? `${all.length} 条 · 待处理 ${all.filter(x => x.status === '待处理').length}${others ? ' · 他人 ' + others : ''} · ${stateTxt}`
+  $('#noteCount').textContent = (all.length || hidden)
+    ? `${all.length} 条${others ? ' · 他人 ' + others : ''}${hidden ? ' · 已改已隐藏 ' + hidden : ''} · ${stateTxt}`
     : stateTxt;
   if (!all.length) {
-    list.innerHTML = '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>，或点击任意空处标注<b>自由位置</b>；按住 <b>Shift 拖拽</b>可框选一块区域批注。意见自动带楼层、坐标与当前视角。</div>';
+    list.innerHTML = hidden
+      ? '<div class="note-empty">没有待处理的批注。<br>已改的记录已隐藏，点右上角「已改」可查看。</div>'
+      : '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>，或点击任意空处标注<b>自由位置</b>；按住 <b>Shift 拖拽</b>可框选一块区域批注。意见自动带楼层、坐标与当前视角。</div>';
     return;
   }
   seqMap = noteSeq();
@@ -1963,6 +1970,11 @@ function toggleReview() {
   else { closeComposer(); setNotePanel(false); stopSync(); }
 }
 $('#btnReview').onclick = toggleReview;
+$('#noteDone').onclick = () => {
+  showDone = !showDone;
+  $('#noteDone').classList.toggle('on', showDone);
+  renderNotes();
+};
 $('#noteClose').onclick = () => { setNotePanel(false); };
 $('#ncCancel').onclick = closeComposer;
 $('#ncSave').onclick = saveNote;
