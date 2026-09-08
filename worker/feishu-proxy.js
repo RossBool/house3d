@@ -9,6 +9,8 @@
      BITABLE_APP_TOKEN   多维表格 app_token   （URL /base/ 后面那段）
      TABLE_ID            数据表 table_id      （URL ?table= 参数）
      ALLOW_ORIGIN        允许的前端来源（默认 https://rossbool.github.io）
+     GITHUB_TOKEN        （可选）细粒度 PAT：Issues 读写 + Contents 读写，配了才同步 GitHub Issues
+     GITHUB_REPO         （可选）默认 RossBool/house3d
 
    路由：
      POST /note          新增/更新一条批注
@@ -103,6 +105,88 @@ async function ensureFields(env, token) {
   }
   return { ok: true, created, total: SCHEMA.length };
 }
+/* ---------- GitHub Issues 同步（配了 GITHUB_TOKEN 才启用） ---------- */
+const ghRepo = env => env.GITHUB_REPO || 'RossBool/house3d';
+const ghOn = env => !!(env.GITHUB_TOKEN && env.GITHUB_TOKEN.length > 10);
+async function ghApi(env, path, init = {}) {
+  const r = await fetch(`https://api.github.com${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'house3d-note-proxy',
+      ...(init.headers || {}),
+    },
+  });
+  const txt = await r.text();
+  let j = null; try { j = JSON.parse(txt); } catch (e) { }
+  return { ok: r.ok, status: r.status, j, txt };
+}
+/* 缩略图提交到仓库 notes-img/ 下，便于 Issue 里内嵌显示 */
+async function ghUploadImg(env, id, dataUrl) {
+  const m = /^data:image\/(\w+);base64,(.*)$/.exec(dataUrl || '');
+  if (!m) return null;
+  const path = `notes-img/${id}.jpg`;
+  const url = `https://api.github.com/repos/${ghRepo(env)}/contents/${path}`;
+  let sha;
+  const cur = await ghApi(env, `/repos/${ghRepo(env)}/contents/${path}`);
+  if (cur.ok && cur.j) sha = cur.j.sha;
+  const body = { message: `note img: ${id}`, content: m[2], ...(sha ? { sha } : {}) };
+  const r = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'house3d-note-proxy', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) return null;
+  return `https://raw.githubusercontent.com/${ghRepo(env)}/main/${path}`;
+}
+async function ghEnsureLabel(env, name, color) {
+  await ghApi(env, `/repos/${ghRepo(env)}/labels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, color }),
+  });   // 已存在会返回 422，忽略
+}
+async function ghCreateIssue(env, b, imgUrl) {
+  await ghEnsureLabel(env, '批注', 'b5442d');
+  await ghEnsureLabel(env, b.cat || '其他', 'd9d2c0');
+  const body = [
+    `**类别**：${b.cat || '-'}　**楼层**：${b.floorName || b.floor}　**对象**：${b.obj}（${b.kind || '-'}）`,
+    '',
+    b.text || '',
+    '',
+    `- 位置：x${b.coords ? b.coords[0] : '-'} y${b.coords ? b.coords[1] : '-'}${b.region ? `　区域 ${b.region.w.toFixed(1)}×${b.region.h.toFixed(1)}m` : ''}`,
+    b.cam ? `- 视角：(${b.cam.p.join(',')}) → (${b.cam.t.join(',')})` : '',
+    `- 提出：${b.author || '匿名'} ${b.ts || ''}`,
+    `- 批注ID：\`${b.id}\`　（在模型页点该批注的「定位」可精确复现位置）`,
+    imgUrl ? `\n![缩略图](${imgUrl})` : '',
+  ].filter(Boolean).join('\n');
+  const r = await ghApi(env, `/repos/${ghRepo(env)}/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: `[批注] ${b.floorName || b.floor} · ${b.obj} · ${b.cat || ''}`.trim(),
+      body,
+      labels: ['批注', b.cat || '其他'],
+    }),
+  });
+  return r.ok ? { number: r.j.number, url: r.j.html_url } : { error: r.status, msg: r.j && r.j.message };
+}
+async function ghFindIssue(env, noteId) {
+  const q = encodeURIComponent(`repo:${ghRepo(env)} is:issue "批注ID" "${noteId}"`);
+  const r = await ghApi(env, `/search/issues?q=${q}`);
+  return r.ok && r.j && r.j.items && r.j.items[0] ? r.j.items[0] : null;
+}
+async function ghSetIssueState(env, noteId, state) {
+  const it = await ghFindIssue(env, noteId);
+  if (!it) return { error: 'not found' };
+  const r = await ghApi(env, `/repos/${ghRepo(env)}/issues/${it.number}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state }),
+  });
+  return r.ok ? { number: it.number, state } : { error: r.status };
+}
 const F = (v) => (v === undefined || v === null ? '' : v);
 
 export default {
@@ -115,7 +199,12 @@ export default {
         const token0 = await tenantToken(env);
         if (!env.BITABLE_APP_TOKEN || !env.TABLE_ID) return json(env, { ok: false, msg: 'BITABLE_APP_TOKEN / TABLE_ID 未配置' }, 400);
         const f = await ensureFields(env, token0);
-        return json(env, { ok: f.ok, fieldsCreated: f.created, fieldsTotal: f.total, msg: f.msg || '' });
+        let gh = { enabled: ghOn(env) };
+        if (ghOn(env)) {
+          const me = await ghApi(env, `/repos/${ghRepo(env)}`);
+          gh = { enabled: true, repo: ghRepo(env), accessible: me.ok, msg: me.ok ? '' : (me.j && me.j.message) };
+        }
+        return json(env, { ok: f.ok, fieldsCreated: f.created, fieldsTotal: f.total, msg: f.msg || '', github: gh });
       }
 
       const token = await tenantToken(env);
@@ -154,7 +243,13 @@ export default {
           body: JSON.stringify({ fields }),
         });
         const j = await r.json();
-        return json(env, { ...j, upsert: exist ? 'updated' : 'created' }, j.code === 0 ? 200 : 400);
+        let issue = null;
+        if (j.code === 0 && ghOn(env) && !exist) {          // 首次写入才建 Issue，避免重复
+          let imgUrl = null;
+          if (b.img) imgUrl = await ghUploadImg(env, b.id, b.img).catch(() => null);
+          issue = await ghCreateIssue(env, b, imgUrl).catch(e => ({ error: String(e) }));
+        }
+        return json(env, { ...j, upsert: exist ? 'updated' : 'created', issue }, j.code === 0 ? 200 : 400);
       }
 
       if (url.pathname === '/status' && req.method === 'POST') {
@@ -174,7 +269,11 @@ export default {
           body: JSON.stringify({ fields: { '状态': b.status } }),
         });
         const j = await r.json();
-        return json(env, j, j.code === 0 ? 200 : 400);
+        let issue = null;
+        if (j.code === 0 && ghOn(env)) {
+          issue = await ghSetIssueState(env, b.id, b.status === '已改' || b.status === '驳回' ? 'closed' : 'open').catch(e => ({ error: String(e) }));
+        }
+        return json(env, { ...j, issue }, j.code === 0 ? 200 : 400);
       }
 
       if (url.pathname === '/notes' && req.method === 'GET') {
