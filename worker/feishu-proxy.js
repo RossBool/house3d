@@ -244,10 +244,16 @@ export default {
         });
         const j = await r.json();
         let issue = null;
-        if (j.code === 0 && ghOn(env) && !exist) {          // 首次写入才建 Issue，避免重复
-          let imgUrl = null;
-          if (b.img) imgUrl = await ghUploadImg(env, b.id, b.img).catch(() => null);
-          issue = await ghCreateIssue(env, b, imgUrl).catch(e => ({ error: String(e) }));
+        if (j.code === 0 && ghOn(env)) {
+          // 该批注尚无 Issue 就补建（重推即幂等，可用于历史批注回填）
+          const found = await ghFindIssue(env, b.id).catch(() => null);
+          if (!found) {
+            let imgUrl = null;
+            if (b.img) imgUrl = await ghUploadImg(env, b.id, b.img).catch(() => null);
+            issue = await ghCreateIssue(env, b, imgUrl).catch(e => ({ error: String(e) }));
+          } else {
+            issue = { number: found.number, url: found.html_url, existed: true };
+          }
         }
         return json(env, { ...j, upsert: exist ? 'updated' : 'created', issue }, j.code === 0 ? 200 : 400);
       }
