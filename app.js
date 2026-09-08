@@ -630,6 +630,13 @@ FLOORS.forEach(F0 => {
     box(0.7, 0.3, 0.7, MAT.extWall, 9.6, 0, 0.9, 0, solid, false); // 检修孔
   }
 
+  /* 墙体纳入拾取：悬停墙面显示墙名，同时充当射线遮挡体（防穿透） */
+  solid.children.forEach(c => {
+    if (!c.name || !c.name.startsWith('wall:')) return;
+    c.userData = { pick: 'wall', floorId: F0.id, name: c.name.slice(5), desc: '墙体「' + c.name.slice(5) + '」（' + F0.name + '）' };
+    pickables.push(c);
+  });
+
   /* 家具 */
   F0.furniture.forEach(f => {
     if (f.type === 'liftCar') return;
@@ -792,15 +799,18 @@ function pickAt(cx, cy) {
   ptr.y = -(cy / innerHeight) * 2 + 1;
   ray.setFromCamera(ptr, activeCam);
   const hits = ray.intersectObjects(activeFloor().pickables.filter(p => p.visible), true);
-  for (const h of hits) {
-    let o = h.object;
-    while (o && !o.userData.pick) o = o.parent;
-    if (o) return o;
-  }
-  return null;
+  if (!hits.length) return null;
+  /* 只认最近命中面：墙面/玻璃同样参与遮挡，杜绝"指着墙显示墙后家具"的穿透 */
+  let o = hits[0].object;
+  while (o && !o.userData.pick) o = o.parent;
+  return o || null;
 }
+let hoverT = 0;
 renderer.domElement.addEventListener('pointermove', e => {
   if (planMode || vr.on) { chip.style.display = 'none'; return; }
+  const now = performance.now();
+  if (now - hoverT < 30) return;
+  hoverT = now;
   const o = pickAt(e.clientX, e.clientY);
   if (o) {
     const bb = new THREE.Box3().setFromObject(o);
