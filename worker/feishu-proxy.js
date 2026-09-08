@@ -105,6 +105,21 @@ async function ensureFields(env, token) {
   }
   return { ok: true, created, total: SCHEMA.length };
 }
+/* ---------- 批注审查（确定性规则，判定无意义/恶意内容 → 自动驳回并关单） ---------- */
+function judgeNote(text) {
+  const t = String(text || '').trim();
+  if (t.length < 2) return { bad: true, reason: '内容过短（少于 2 个字符）' };
+  const letters = (t.match(/[\u4e00-\u9fa5a-zA-Z]/g) || []).length;
+  if (letters === 0) return { bad: true, reason: '无有效文字（纯数字或符号）' };
+  const freq = {};
+  for (const ch of t) freq[ch] = (freq[ch] || 0) + 1;
+  const max = Math.max(...Object.values(freq));
+  if (max / t.length > 0.6) return { bad: true, reason: '内容为重复字符' };
+  if (letters / t.length < 0.25) return { bad: true, reason: '有效文字占比过低' };
+  const inject = /(忽略(之前|以上|前面).{0,6}(指令|提示)|ignore\s+(previous|above)|system\s*prompt|执行(以下|下面)命令|rm\s+-rf|删除(仓库|数据库)|(^|\s)curl\s+http|powershell|base64\s+-d)/i;
+  if (inject.test(t)) return { bad: true, reason: '疑似指令注入 / 与模型审查无关的内容' };
+  return { bad: false, reason: '' };
+}
 /* ---------- GitHub Issues 同步（配了 GITHUB_TOKEN 才启用） ---------- */
 const ghRepo = env => env.GITHUB_REPO || 'RossBool/house3d';
 const ghOn = env => !!(env.GITHUB_TOKEN && env.GITHUB_TOKEN.length > 10);
@@ -147,7 +162,7 @@ async function ghEnsureLabel(env, name, color) {
     body: JSON.stringify({ name, color }),
   });   // 已存在会返回 422，忽略
 }
-async function ghCreateIssue(env, b, imgUrl) {
+async function ghCreateIssue(env, b, imgUrl, verdict) {
   await ghEnsureLabel(env, '批注', 'b5442d');
   await ghEnsureLabel(env, b.cat || '其他', 'd9d2c0');
   const body = [
@@ -170,7 +185,20 @@ async function ghCreateIssue(env, b, imgUrl) {
       labels: ['批注', b.cat || '其他'],
     }),
   });
-  return r.ok ? { number: r.j.number, url: r.j.html_url } : { error: r.status, msg: r.j && r.j.message };
+  if (!r.ok) return { error: r.status, msg: r.j && r.j.message };
+  const out = { number: r.j.number, url: r.j.html_url };
+  if (verdict && verdict.bad) {
+    await ghApi(env, `/repos/${ghRepo(env)}/issues/${r.j.number}/comments`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: `🤖 自动审查未通过：**${verdict.reason}**\n该批注不作为修改依据，已自动关闭。` }),
+    });
+    await ghApi(env, `/repos/${ghRepo(env)}/issues/${r.j.number}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'closed', labels: ['批注', b.cat || '其他', '疑似无效'] }),
+    });
+    out.closed = true;
+  }
+  return out;
 }
 async function ghFindIssue(env, noteId) {
   const q = encodeURIComponent(`repo:${ghRepo(env)} is:issue "批注ID" "${noteId}"`);
@@ -212,6 +240,8 @@ export default {
 
       if (url.pathname === '/note' && req.method === 'POST') {
         const b = await req.json();
+        const verdict = judgeNote(b.text);
+        if (verdict.bad) b.status = '驳回';               // 无意义/恶意 → 直接驳回（联动关单）
         const fields = {
           '批注ID': F(b.id),
           '楼层': F(b.floorName || b.floor),
@@ -250,12 +280,12 @@ export default {
           if (!found) {
             let imgUrl = null;
             if (b.img) imgUrl = await ghUploadImg(env, b.id, b.img).catch(() => null);
-            issue = await ghCreateIssue(env, b, imgUrl).catch(e => ({ error: String(e) }));
+            issue = await ghCreateIssue(env, b, imgUrl, verdict).catch(e => ({ error: String(e) }));
           } else {
             issue = { number: found.number, url: found.html_url, existed: true };
           }
         }
-        return json(env, { ...j, upsert: exist ? 'updated' : 'created', issue }, j.code === 0 ? 200 : 400);
+        return json(env, { ...j, upsert: exist ? 'updated' : 'created', issue, verdict }, j.code === 0 ? 200 : 400);
       }
 
       if (url.pathname === '/status' && req.method === 'POST') {
