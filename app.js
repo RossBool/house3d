@@ -866,6 +866,7 @@ renderer.domElement.addEventListener('click', e => {
   }
   const o = pickAt(e.clientX, e.clientY);
   if (!o) return;
+  if (reviewMode) { openComposer(o); return; }
   if (o.userData.pick === 'room') {
     showInfo({ pick: 'room', room: o.userData.room });
     const [x1, y1, x2, y2] = o.userData.room.bbox;
@@ -1564,6 +1565,141 @@ window.__step = (n = 1) => {
   }
   return n;
 };
+
+/* ============================================================
+   批注模式（纯前端）：点选对象 → 写意见 → 本地留存/导出
+   记录含：楼层、对象名与类型、坐标、相机视角、缩略图、类别、状态
+   ============================================================ */
+let reviewMode = false;
+let pendingPick = null;
+let pendingCat = '位置';
+const NOTE_KEY = 'house3d-notes-v1';
+const NOTE_CATS = ['位置', '朝向', '尺寸', '材质', '增删', '其他'];
+const notes = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || '[]'); } catch (e) { return []; } })();
+function saveNotes() { try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch (e) { } }
+function noteAuthor() {
+  const el = $('#ncAuthor');
+  const a = ((el && el.value.trim()) || localStorage.getItem('house3d-author') || '匿名').slice(0, 12);
+  try { localStorage.setItem('house3d-author', a); } catch (e) { }
+  return a;
+}
+function thumb() {
+  /* 320×200 缩略图，控制 localStorage 体积 */
+  const cv = renderer.domElement;
+  const c = document.createElement('canvas'); c.width = 320; c.height = 200;
+  const x = c.getContext('2d');
+  x.drawImage(cv, 0, 0, 320, 200);
+  return c.toDataURL('image/jpeg', 0.55);
+}
+function openComposer(o) {
+  const ud = o.userData;
+  const isRoom = ud.pick === 'room';
+  const name = isRoom ? ud.room.name : (ud.name || '构件');
+  const kind = isRoom ? '房间' : (ud.pick === 'wall' ? '墙体' : (ud.typeKey || '家具'));
+  const F0 = activeFloor().data;
+  let cx, cz;
+  if (isRoom) { const b = ud.room.bbox; cx = (b[0] + b[2]) / 2; cz = (b[1] + b[3]) / 2; }
+  else { const b = new THREE.Box3().setFromObject(o); cx = (b.min.x + b.max.x) / 2; cz = (b.min.z + b.max.z) / 2; }
+  pendingPick = {
+    floor: F0.id, floorName: F0.name, obj: name, kind,
+    coords: [+cx.toFixed(2), +cz.toFixed(2)],
+    cam: { p: perspCam.position.toArray().map(v => +v.toFixed(2)), t: controls.target.toArray().map(v => +v.toFixed(2)) },
+    img: thumb(),
+  };
+  $('#ncTitle').innerHTML = `批注：<b>${name}</b> <span style="color:var(--ink2);font-size:12px">（${kind} · ${F0.name} · x${cx.toFixed(2)} y${cz.toFixed(2)}）</span>`;
+  $('#ncCats').innerHTML = NOTE_CATS.map(c => `<button data-c="${c}" class="${c === pendingCat ? 'on' : ''}">${c}</button>`).join('');
+  $('#ncText').value = '';
+  try { $('#ncAuthor').value = localStorage.getItem('house3d-author') || ''; } catch (e) { }
+  $('#noteComposer').classList.add('open');
+  $('#ncText').focus();
+}
+function closeComposer() { $('#noteComposer').classList.remove('open'); pendingPick = null; }
+function saveNote() {
+  const txt = $('#ncText').value.trim();
+  if (!txt) { $('#ncText').focus(); return; }
+  if (!pendingPick) return;
+  notes.unshift({
+    id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    ts: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    author: noteAuthor(), cat: pendingCat, text: txt, status: '待处理',
+    ...pendingPick,
+  });
+  saveNotes(); closeComposer(); renderNotes(); $('#notePanel').classList.add('open');
+}
+function renderNotes() {
+  const list = $('#noteList');
+  $('#noteCount').textContent = notes.length ? `${notes.length} 条 · 待处理 ${notes.filter(n => n.status === '待处理').length}` : '';
+  if (!notes.length) {
+    list.innerHTML = '<div class="note-empty">还没有批注。<br>开启「批注」后点击任意<b>家具 / 房间 / 墙面</b>即可写下意见；意见自动带楼层、对象、坐标与当前视角。</div>';
+    return;
+  }
+  list.innerHTML = notes.map(n => `
+    <div class="note-card ${n.status === '已改' ? 'done' : ''}" data-id="${n.id}">
+      <div class="nc-h"><span class="nc-floor">${n.floorName || n.floor}</span><span class="nc-cat">${n.cat}</span><span class="nc-obj">${n.obj}</span></div>
+      <div class="nc-txt">${n.text.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</div>
+      <div class="nc-meta">${n.author} · ${n.ts} · x${n.coords[0]} y${n.coords[1]}</div>
+      <div class="nc-acts">
+        <button data-a="go">定位</button>
+        <button data-a="done" class="${n.status === '已改' ? 'on' : ''}">${n.status === '已改' ? '已改' : '标记已改'}</button>
+        <button data-a="copy">复制意见卡</button>
+        <button data-a="del">删除</button>
+      </div>
+    </div>`).join('');
+}
+function noteCardText(n) {
+  return `【批注】${n.floorName} · ${n.obj}（${n.kind}）\n类别：${n.cat}\n问题：${n.text}\n位置：x${n.coords[0]} y${n.coords[1]}　视角：(${n.cam.p.join(',')}) → (${n.cam.t.join(',')})\n提出：${n.author} ${n.ts}`;
+}
+function goToNote(n) {
+  if (n.floor !== activeId) switchFloor(n.floor);
+  const p = new THREE.Vector3(...n.cam.p), t = new THREE.Vector3(...n.cam.t);
+  flyTo(p, t, 1.2);
+}
+function exportNotes() {
+  const blob = new Blob([JSON.stringify({ project: META.project, exported: new Date().toISOString(), notes }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'house3d-批注-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function copyMarkdown() {
+  if (!notes.length) return;
+  const md = '# ' + META.project + ' 批注意见（' + notes.length + ' 条）\n\n' +
+    notes.map((n, i) => `${i + 1}. **${n.floorName} · ${n.obj}**（${n.kind}）\n   - 类别：${n.cat}　状态：${n.status}\n   - 问题：${n.text}\n   - 位置：x${n.coords[0]} y${n.coords[1]}\n   - 提出：${n.author} ${n.ts}`).join('\n');
+  navigator.clipboard.writeText(md).then(() => {
+    const b = $('#noteMd'); const old = b.textContent; b.textContent = '已复制 ✓';
+    setTimeout(() => b.textContent = old, 1200);
+  }).catch(() => alert('复制失败，请手动选择文本'));
+}
+function toggleReview() {
+  reviewMode = !reviewMode;
+  $('#btnReview').classList.toggle('on', reviewMode);
+  renderer.domElement.style.cursor = reviewMode ? 'crosshair' : '';
+  if (reviewMode) { renderNotes(); $('#notePanel').classList.add('open'); if (!notes.length) $('#notePanel').classList.remove('open'); }
+  else { closeComposer(); $('#notePanel').classList.remove('open'); }
+}
+$('#btnReview').onclick = toggleReview;
+$('#noteClose').onclick = () => { $('#notePanel').classList.remove('open'); };
+$('#ncCancel').onclick = closeComposer;
+$('#ncSave').onclick = saveNote;
+$('#ncCats').addEventListener('click', e => {
+  const b = e.target.closest('button[data-c]'); if (!b) return;
+  pendingCat = b.dataset.c;
+  $('#ncCats').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#noteList').addEventListener('click', e => {
+  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const card = b.closest('.note-card'); const n = notes.find(x => x.id === card.dataset.id);
+  if (!n) return;
+  const a = b.dataset.a;
+  if (a === 'go') goToNote(n);
+  else if (a === 'done') { n.status = n.status === '已改' ? '待处理' : '已改'; saveNotes(); renderNotes(); }
+  else if (a === 'del') { if (confirm('删除这条批注？')) { notes.splice(notes.indexOf(n), 1); saveNotes(); renderNotes(); } }
+  else if (a === 'copy') navigator.clipboard.writeText(noteCardText(n)).then(() => { b.textContent = '已复制 ✓'; setTimeout(() => b.textContent = '复制意见卡', 1200); });
+});
+$('#noteExport').onclick = exportNotes;
+$('#noteMd').onclick = copyMarkdown;
+$('#noteClear').onclick = () => { if (notes.length && confirm('清空全部 ' + notes.length + ' 条批注？导出后清空更稳妥。')) { notes.length = 0; saveNotes(); renderNotes(); } };
+window.__notes = { all: () => notes, toggleReview, openComposer, exportNotes };
 window.__app = { setMode, setNight, togglePlan, enterVR, exitVR, enterRoom, resetView, switchFloor, FLOORS, perspCam, controls, cancelFly: () => { flyAnim = null; }, pickables: () => activeFloor().pickables };
 /* 全楼层最终去穿插（在所有组装完成后统一执行） */
 for (const id in floorObjs) decollideFloor(floorObjs[id].solid, floorObjs[id].furn);
