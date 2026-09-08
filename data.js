@@ -586,7 +586,11 @@ const FLOORS = [
       { id: 'pm4', name: '铺面 ③', bbox: [6.1, 12.2, 10.5, 18.3], floor: 'cement' },
       { id: 'pm5', name: '铺面 ③（东侧）', bbox: [8.1, 6.1, 10.5, 9.5], floor: 'cement' },
     ],
-    furniture: [],
+    furniture: [
+      { room: 'gga', type: 'car', pos: [2.95, 1.4], rot: 0, name: '轿车', desc: '公共车库泊位轿车（4.4×1.78），车头朝西沿北墙停放。' },
+      { room: 'sja', type: 'car', pos: [7.35, 3.0], rot: Math.PI / 2, name: '轿车', desc: '私人车库泊位轿车之一，车头朝北对 M2730 车库门。' },
+      { room: 'sja', type: 'car', pos: [9.45, 3.0], rot: Math.PI / 2, carRed: true, name: '轿车', desc: '私人车库泊位轿车之二，与西侧车位并列。' },
+    ],
     mark: [4.7, 13.6, '±0.000'],
   },
   {
