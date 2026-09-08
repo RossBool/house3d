@@ -12,11 +12,14 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # 可选：配了 GH_ISSUES_TOKEN 才会同步 GitHub Issues；未配置时下列步骤自动跳过
+      GH_ISSUES_TOKEN: ${{ secrets.GH_ISSUES_TOKEN }}
     steps:
       - name: 拉取仓库
         uses: actions/checkout@v4
 
-      - name: 部署到 Cloudflare Workers（并注入密钥）
+      - name: 部署到 Cloudflare Workers（并注入飞书密钥）
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -28,20 +31,25 @@ jobs:
             BITABLE_APP_TOKEN
             TABLE_ID
             ALLOW_ORIGIN
-            GITHUB_TOKEN
-            GITHUB_REPO
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           BITABLE_APP_TOKEN: ${{ secrets.BITABLE_APP_TOKEN }}
           TABLE_ID: ${{ secrets.TABLE_ID }}
           ALLOW_ORIGIN: https://rossbool.github.io
-          # 配了 GITHUB_TOKEN 才会同步 GitHub Issues（未配置时留空即可，Worker 自动跳过）
-          GITHUB_TOKEN: ${{ secrets.GH_ISSUES_TOKEN }}
-          GITHUB_REPO: RossBool/house3d
+
+      - name: 注入 GitHub Issues 令牌（可选）
+        if: env.GH_ISSUES_TOKEN != ''
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "$GH_ISSUES_TOKEN" | npx wrangler secret put GITHUB_TOKEN
+          echo "RossBool/house3d" | npx wrangler secret put GITHUB_REPO
+          echo "✅ GitHub Issues 同步已启用"
 
       - name: 部署结果提示
         run: |
           echo "✅ Worker 已部署"
           echo "自检地址： https://house3d-note-proxy.<你的账户子域>.workers.dev/health"
-          echo "（子域在 Cloudflare 控制台 Workers & Pages 页面右侧可见）"
