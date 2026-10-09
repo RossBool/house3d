@@ -174,6 +174,36 @@
   }
   #hint b{color:var(--accent);font-weight:600}
 
+  /* ---- 最新户型图 弹层 ---- */
+  #sheetBox{
+    position:fixed;inset:0;z-index:60;display:none;
+    background:rgba(28,24,18,.55);backdrop-filter:blur(3px);
+    align-items:center;justify-content:center;padding:28px;
+  }
+  #sheetBox.open{display:flex}
+  #sheetFrame{
+    background:var(--paper);border:1px solid var(--line);border-radius:6px;
+    max-width:min(92vw,860px);max-height:92vh;display:flex;flex-direction:column;
+    box-shadow:0 18px 60px rgba(20,16,10,.35);overflow:hidden;
+  }
+  #sheetFrame header{
+    display:flex;align-items:center;gap:10px;padding:10px 14px;
+    border-bottom:1px solid var(--line);flex:0 0 auto;
+  }
+  #sheetFrame header b{font-size:15px;letter-spacing:.1em}
+  #sheetTabs{display:flex;gap:4px;margin-left:8px;flex:1}
+  #sheetTabs button{
+    font-family:inherit;font-size:12px;padding:4px 12px;cursor:pointer;
+    border:1px solid var(--line);border-radius:3px;background:transparent;color:var(--ink2);
+  }
+  #sheetTabs button.on{background:var(--ink);color:#f4efe4;border-color:var(--ink)}
+  #sheetClose{border:none;background:none;font-size:18px;cursor:pointer;color:var(--ink2);padding:2px 8px}
+  #sheetImg{
+    flex:1 1 auto;min-height:0;object-fit:contain;width:100%;height:100%;
+    max-height:calc(92vh - 96px);display:block;background:var(--paper);
+  }
+  #sheetNote{padding:8px 14px;font-size:11px;color:var(--ink2);border-top:1px solid var(--line);flex:0 0 auto}
+
   /* ---- 夜间模式下 UI 微调 ---- */
   body.is-night #brand .meta h1{color:#e8e2d2}
   body.is-night #hint,body.is-night #bInfo p{color:#b7b0a0}
@@ -308,6 +338,7 @@
   <button class="tbtn mobile-only" id="btnRooms">房间</button>
   <button class="tbtn" id="btnVR">VR 漫游</button>
   <button class="tbtn" id="btnPlan">平面图</button>
+  <button class="tbtn" id="btnSheets">户型图</button>
   <button class="tbtn" id="btnReview">批注</button>
   <button class="tbtn" id="btnReset">总览</button>
 </div>
@@ -342,12 +373,44 @@
   <div id="ncWarn">内容疑似无意义（纯数字/重复字符/过短），提交后会被自动驳回</div>
   <div id="ncActions"><button id="ncCancel">取消</button><button id="ncSave">保存批注</button></div>
 </div>
+<div id="sheetBox">
+  <div id="sheetFrame">
+    <header><b>最新户型图</b><div id="sheetTabs">
+      <button data-s="std" class="on">标准层 2—9F</button>
+      <button data-s="f10">十层</button>
+      <button data-s="f11">十一层</button>
+    </div><button id="sheetClose">×</button></header>
+    <img id="sheetImg" src="./plans/plan-std-2-9F.png" alt="户型图"/>
+    <div id="sheetNote">按设计师最新平面布置图矢量重绘 · 图纸未标注尺寸，图中尺寸为按家具比例推算的约值，施工以正式图纸为准</div>
+  </div>
+</div>
 <div id="hint">左键拖拽旋转 · 滚轮缩放 · <b>点击房间/家具</b>查看讲解 · <b>VR 漫游</b>：拖拽环视/点地行走 · <b>右侧切换楼层</b> · 快捷键 <b>1/2/3</b> 材质 <b>N</b> 昼夜 <b>F</b> 家具 <b>P</b> 平面图 <b>R</b> 复位</div>
 
-<script src="./data.js?v=45"></script>
+<script src="./data.js?v=46"></script>
 <script type="importmap">{ "imports": { "three": "./libs/three.module.js" } }</script>
-<script type="module" src="./app.js?v=45"></script>
+<script type="module" src="./app.js?v=46"></script>
 <script>
+  (function(){
+    var box=document.getElementById('sheetBox');
+    var img=document.getElementById('sheetImg');
+    var srcs={std:'./plans/plan-std-2-9F.png',f10:'./plans/plan-10F.png',f11:'./plans/plan-11F.png'};
+    function openSheets(){box.classList.add('open');}
+    function closeSheets(){box.classList.remove('open');}
+    document.getElementById('btnSheets').addEventListener('click',function(){
+      box.classList.contains('open')?closeSheets():openSheets();
+    });
+    document.getElementById('sheetClose').addEventListener('click',closeSheets);
+    box.addEventListener('click',function(e){if(e.target===box)closeSheets();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeSheets();});
+    var tabs=document.querySelectorAll('#sheetTabs button');
+    tabs.forEach(function(b){
+      b.addEventListener('click',function(){
+        tabs.forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');
+        img.src=srcs[b.dataset.s];
+      });
+    });
+  })();
   window.__errs = [];
   window.addEventListener('error', e => window.__errs.push(e.message + ' @' + (e.filename||'') + ':' + e.lineno));
   window.addEventListener('unhandledrejection', e => window.__errs.push('rejection: ' + String(e.reason)));

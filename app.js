@@ -16,6 +16,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
 document.getElementById('stage').appendChild(renderer.domElement);
 /* 窗口/分栏尺寸变化：同步画布缓冲与相机纵横比（避免拉伸模糊与纵横比错乱） */
 addEventListener('resize', () => {
@@ -25,6 +26,60 @@ addEventListener('resize', () => {
 });
 
 const scene = new THREE.Scene();
+
+/* ---------- 天空穹顶（渐变）与星空 ---------- */
+const skyUniforms = {
+  topColor: { value: new THREE.Color(0x7fb0dd) },
+  bottomColor: { value: new THREE.Color(0xe9e0cd) },
+  offset: { value: 20 },
+  exponent: { value: 0.75 }
+};
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(180, 32, 20),
+  new THREE.ShaderMaterial({
+    uniforms: skyUniforms,
+    side: THREE.BackSide,
+    fog: false,
+    depthWrite: false,
+    vertexShader: `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = wp.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 topColor; uniform vec3 bottomColor;
+      uniform float offset; uniform float exponent;
+      varying vec3 vWorldPosition;
+      void main() {
+        float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+      }`
+  })
+);
+sky.visible = false;
+scene.add(sky);
+
+const starGeo = new THREE.BufferGeometry();
+{
+  const N = 600, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const u = Math.random() * Math.PI * 2;
+    const v = Math.acos(Math.random() * 0.92); // 偏向上半球
+    const r = 150;
+    pos[i * 3] = r * Math.sin(v) * Math.cos(u);
+    pos[i * 3 + 1] = Math.abs(r * Math.cos(v)) + 6;
+    pos[i * 3 + 2] = r * Math.sin(v) * Math.sin(u);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+}
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+  color: 0xcfd8ee, size: 0.55, sizeAttenuation: false,
+  transparent: true, opacity: 0.9, fog: false, depthWrite: false
+}));
+stars.visible = false;
+scene.add(stars);
 
 const perspCam = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.25, 260);
 perspCam.position.set(21, 17, 30);
@@ -44,7 +99,7 @@ controls.minDistance = 1.2;
 controls.maxPolarAngle = Math.PI * 0.495;
 
 /* ---------- 光照 ---------- */
-const hemi = new THREE.HemisphereLight(0xdfe8f2, 0x8d8672, 0.55);
+const hemi = new THREE.HemisphereLight(0xdfe8f2, 0x8d8672, 0.6);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2dd, 3.0);
 sun.position.set(26, 32, 10);
@@ -69,7 +124,7 @@ const MAT = {
   parapet: std(0xd9d2c0, 0.9),
   slab: std(0xcbc4b2, 0.9),
   frame: std(0x6a6f74, 0.5, 0.6),
-  glass: new THREE.MeshStandardMaterial({ color: 0x9fb6c4, roughness: 0.12, metalness: 0.4, transparent: true, opacity: 0.28 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x9fb6c4, roughness: 0.12, metalness: 0.4, transparent: true, opacity: 0.32 }),
   doorWood: std(0x8a6844, 0.6),
   doorGlass: std(0x7e99a8, 0.15, 0.3),
   steel: std(0xb9bec4, 0.35, 0.85),
@@ -710,7 +765,7 @@ FLOORS.forEach(F0 => {
 /* ---------- 场地 ---------- */
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(60, 72),
-  new THREE.MeshStandardMaterial({ color: 0xcac2ae, roughness: 1 })
+  new THREE.MeshStandardMaterial({ color: 0xd0c7b2, roughness: 1 })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.set(5.95, -0.6, 9.35);
@@ -747,15 +802,21 @@ function setMode(m) {
 function solidApplyEnv() {
   sun.castShadow = mode === 'real';
   if (mode === 'real') {
-    scene.background = new THREE.Color(night ? 0x0b101d : 0xccd6df);
-    scene.fog = new THREE.Fog(night ? 0x0b101d : 0xccd6df, 60, 180);
-    hemi.intensity = night ? 0.12 : 0.55;
+    sky.visible = true;
+    stars.visible = night;
+    scene.background = null;
+    skyUniforms.topColor.value.set(night ? 0x0a1226 : 0x7fb0dd);
+    skyUniforms.bottomColor.value.set(night ? 0x182238 : 0xe9e0cd);
+    scene.fog = new THREE.Fog(night ? 0x0a1226 : 0xdfe0d8, 60, 180);
+    hemi.intensity = night ? 0.12 : 0.6;
     hemi.color.set(night ? 0x36415e : 0xdfe8f2);
     sun.intensity = night ? 0.25 : 3.0;
     sun.color.set(night ? 0x8ea2c8 : 0xfff2dd);
     sunFill.intensity = night ? 0.1 : 0.7;
-    ground.material.color.set(night ? 0x11151f : 0xcac2ae);
+    ground.material.color.set(night ? 0x11151f : 0xd0c7b2);
   } else {
+    sky.visible = false;
+    stars.visible = false;
     scene.background = new THREE.Color(mode === 'wire' ? (night ? 0x14171c : 0xf4efe4) : (night ? 0x1a1d24 : 0xe9e7e2));
     scene.fog = null;
     hemi.intensity = 0.75;
