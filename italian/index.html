@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="意式现代住宅全景，按实际生成进度逐步开放完整原图预览。">
+  <title>意式现代 · 全屋全景</title>
+  <link rel="stylesheet" href="viewer.css">
+  <script src="tour.js" defer></script>
+  <script src="viewer.js" defer></script>
+</head>
+<body>
+  <canvas id="view" tabindex="0" aria-label="360度全景。拖动环视，滚轮缩放，也可使用方向键。"></canvas>
+  <div id="shade"></div>
+  <header>
+    <div class="brand"><span class="eyebrow">ITALIAN MODERN · PANORAMAS</span><h1>意式现代</h1><p id="roomName">等待首张意式全景</p><p id="renderProgress">正在读取实际进度…</p><p id="qualityBadge">完整原图预览</p><p id="previewNote" hidden></p></div>
+    <nav id="floors" aria-label="选择楼层"></nav>
+    <button id="helpToggle" class="glass" aria-label="查看设计与操作说明">?</button>
+  </header>
+  <div id="empty" role="status"><h2>首张意式全景正在准备</h2><p>从 A 起居开始。完成图像审阅后，才会加入下方房间列表。</p><p class="muted">当前没有可浏览或下载的意式原图。</p><a href="../panorama/">查看既有全景</a></div>
+  <div id="loading" role="status" aria-live="polite" hidden><i></i><span>正在加载完整全景…</span></div>
+  <div id="error" role="alert" hidden></div>
+  <aside id="mapPanel" class="panel" hidden><div class="panelhead"><h2>原户型定位 · 点击选点</h2><button id="mapClose" aria-label="关闭平面图">×</button></div><div id="map"></div><p>只显示实际已接入的意式视点</p></aside>
+  <aside id="help" class="panel" hidden><div class="panelhead"><h2>意式现代 · 材质方向</h2><button id="helpClose" aria-label="关闭说明">×</button></div><p>以暖中性色、胡桃木、浅色石材质感、织物或皮革软包及少量金属细节构成空间。具体搭配以各房间原图为准。</p><p>首间风格预览，门边接痕仍在修整。</p><p>鼠标或单指拖动环视；滚轮或双指缩放。点击房间或平面图圆点切换。方向键环视，＋／− 缩放，Home 回到初始角度。</p><p class="muted">完整原图提供单目360°环视与视点切换。材质为设计表达，实际尺寸和施工仍以建筑图及实物选样为准。</p></aside>
+  <div id="orientation"><span id="bearing">图上</span><div class="compass"><i id="needle"></i></div></div>
+  <div id="tools" aria-label="全景控制"><button id="mapToggle" title="打开平面图">⌖<span>平面图</span></button><button id="rotate" aria-pressed="false" title="自动环视">↻<span>自动环视</span></button><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">−</button><button id="fullscreen" aria-label="全屏查看">⛶</button><button id="trayToggle" aria-pressed="true" title="显示或收起房间">▦<span>房间</span></button></div>
+  <footer id="tray"><div class="traytop"><div id="units" aria-label="选择公寓"></div><span id="counter">0 个可浏览视点</span></div><div class="roomrow"><button id="previous" aria-label="上一个房间" disabled>‹</button><div id="rooms" aria-label="选择房间"></div><button id="next" aria-label="下一个房间" disabled>›</button></div><div class="footnote"><span>拖动环视 · 点击房间切换</span><div class="source-links"><a id="original" hidden target="_blank" rel="noopener">查看完整原图</a><a id="download" hidden download>下载原图</a><a href="../panorama/">既有全景</a></div></div></footer>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "style": "意式现代",
+  "nodes": [
+    {
+      "id": "standard_02",
+      "image": "panoramas/standard_02.png",
+      "width": 3840,
+      "height": 1920,
+      "bytes": 7740615,
+      "sha256": "0d642532dc0a34740c00108d0fecb6f47781bfbf318290dcb3f2d19967e83aca",
+      "style": "意式现代",
+      "approval_status": "PREVIEW_ACCEPTED",
+      "revision": "0d642532dc0a34740c00108d0fecb6f47781bfbf318290dcb3f2d19967e83aca",
+      "reviewed_at": "2026-10-12T10:13:44.632Z",
+      "preview_note": "首间风格预览，门边接痕仍在修整",
+      "initial_yaw": -1.5,
+      "initial_pitch": -0.18
+    }
+  ]
+}

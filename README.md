@@ -7,6 +7,7 @@
 
 ## 在线访问
 
+- 意式现代高清全景预览：**https://rossbool.github.io/house3d/italian/**（目前 1 / 41 个视点；完整原图 3840×1920，门边接痕仍在修整）。
 - 全屋室内全景与轻奢材质方案：**https://rossbool.github.io/house3d/panorama/**
 - 单文件离线全景：[下载 HTML](https://github.com/RossBool/house3d/releases/download/offline-tour-2026-10-12/house3d-offline.html)（约 116 MB；下载完成后用桌面浏览器打开，无需本地服务器）。
 - 新版实景展示：**https://rossbool.github.io/house3d/**
@@ -34,6 +35,7 @@ python3 -m http.server 8765
 | `notes-img/` | 户型相关图片 |
 | `worker/` | 飞书数据同步代理（Cloudflare Worker，可选） |
 | `panorama/` | 41 个新中式室内全景、原图浏览、1 张轻奢餐厨样图与 41 个区域的轻奢拟用材质说明 |
+| `italian/` | 意式现代全景预览，按实际完成的高清完整原图逐步加入；保留原像素加载与下载 |
 
 ## 室内全景版本说明
 
