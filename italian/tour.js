@@ -1682,20 +1682,6 @@ window.TOUR = {
         [
           7.1,
           6.9,
-          7.513,
-          6.9,
-          0.2
-        ],
-        [
-          10.723,
-          6.9,
-          12,
-          6.9,
-          0.2
-        ],
-        [
-          7.1,
-          6.9,
           7.1,
           7.101999999999999,
           0.2
@@ -1748,20 +1734,81 @@ window.TOUR = {
           3.6,
           15,
           0.12
+        ],
+        [
+          7.1,
+          1.9,
+          12,
+          1.9,
+          0.12
+        ],
+        [
+          9,
+          1.9,
+          9,
+          3.4,
+          0.12
+        ],
+        [
+          9,
+          3.4,
+          9,
+          5.8,
+          0.05,
+          "#79969b"
+        ],
+        [
+          9,
+          5.8,
+          9,
+          6.9,
+          0.12
+        ],
+        [
+          7.1,
+          6.9,
+          12,
+          6.9,
+          0.12
         ]
       ],
       "start": "floor11_02",
-      "ready_count": 0,
+      "ready_count": 1,
       "total_count": 7,
       "units": {
         "自用": {
-          "ready": 0,
+          "ready": 1,
           "total": 7
         }
-      }
+      },
+      "plan_revision_note": "餐厨分隔及M2427移门依据原建筑尺寸图补正；位置用于视点示意。"
     }
   },
   "nodes": [
+    {
+      "id": "floor11_02",
+      "model": "floor11",
+      "label": "餐厅 · 独立厨房门外",
+      "unit": "自用",
+      "x": 8.211,
+      "y": 3.246,
+      "z": 1.58,
+      "initial_yaw": 0.8,
+      "initial_pitch": -0.12,
+      "image": "panoramas/floor11_02.png",
+      "width": 1774,
+      "height": 887,
+      "bytes": 1908183,
+      "sha256": "3a2dc3a1433896d4a32d3d6bc426ca8f9672ee03a97d10cfbeead1ca5d0f4b2a",
+      "style": "意式现代",
+      "approval_status": "STYLE_PREVIEW_ACCEPTED",
+      "revision": "3a2dc3a1433896d4a32d3d6bc426ca8f9672ee03a97d10cfbeead1ca5d0f4b2a",
+      "reviewed_at": "2026-10-12T11:38:41.945Z",
+      "quality_tier": "STYLE_PREVIEW",
+      "source_model": "内置生图模型",
+      "material_note": "11层自用餐厅与封闭厨房：暖胡桃木柜体、焦糖色皮革餐椅、暖米白石材、古铜色铝合金安全玻璃推拉门。厨房小备餐台置于封闭空间内，保留两处外窗表达；施工与尺寸以原户型图和实测为准。",
+      "preview_note": "封闭厨房修正版 · 实际1774×887，未达4K；环视投影预览，接缝与极区尚待校正。"
+    },
     {
       "id": "standard_02",
       "model": "standard",
@@ -1787,7 +1834,7 @@ window.TOUR = {
   "start": "standard_02",
   "style": "意式现代",
   "progress": {
-    "completed": 1,
+    "completed": 2,
     "expected": 41,
     "status": "PARTIAL"
   }

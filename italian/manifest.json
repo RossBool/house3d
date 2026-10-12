@@ -3,6 +3,24 @@
   "style": "意式现代",
   "nodes": [
     {
+      "id": "floor11_02",
+      "image": "panoramas/floor11_02.png",
+      "width": 1774,
+      "height": 887,
+      "bytes": 1908183,
+      "sha256": "3a2dc3a1433896d4a32d3d6bc426ca8f9672ee03a97d10cfbeead1ca5d0f4b2a",
+      "style": "意式现代",
+      "approval_status": "STYLE_PREVIEW_ACCEPTED",
+      "revision": "3a2dc3a1433896d4a32d3d6bc426ca8f9672ee03a97d10cfbeead1ca5d0f4b2a",
+      "reviewed_at": "2026-10-12T11:38:41.945Z",
+      "quality_tier": "STYLE_PREVIEW",
+      "source_model": "内置生图模型",
+      "material_note": "11层自用餐厅与封闭厨房：暖胡桃木柜体、焦糖色皮革餐椅、暖米白石材、古铜色铝合金安全玻璃推拉门。厨房小备餐台置于封闭空间内，保留两处外窗表达；施工与尺寸以原户型图和实测为准。",
+      "preview_note": "封闭厨房修正版 · 实际1774×887，未达4K；环视投影预览，接缝与极区尚待校正。",
+      "initial_yaw": 0.8,
+      "initial_pitch": -0.12
+    },
+    {
       "id": "standard_02",
       "image": "panoramas/standard_02.png",
       "width": 3840,
