@@ -32,7 +32,7 @@ for (const node of manifest.nodes) {
     assert.equal(buildTour(catalog,[{...node,approval_status:'DRAFT'}]).nodes.length,0);
     const accepted = buildTour(catalog,[{...node,approval_status:'STYLE_PREVIEW_ACCEPTED'}]);
     assert.equal(accepted.nodes.length,1);
-    assert.equal(accepted.nodes[0].unit,'自用');
+    assert.equal(accepted.nodes[0].unit,original.unit,'Style previews preserve their original apartment ownership.');
   }
   if (node.thumbnail) await fs.access(path.join(root,node.thumbnail));
 }
