@@ -6,12 +6,13 @@ import { createHash } from 'node:crypto';
 export const root = path.dirname(fileURLToPath(import.meta.url));
 const pngMagic = Buffer.from([137,80,78,71,13,10,26,10]);
 
-export function inspectPanorama(bytes) {
+export function inspectPanorama(bytes, { stylePreview = false } = {}) {
   if (bytes.length < 33 || !bytes.subarray(0,8).equals(pngMagic) || bytes.toString('ascii',12,16) !== 'IHDR') {
     throw Error('Expected an original PNG file, not a renamed JPEG or preview.');
   }
   const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
-  if (width < 3840 || width !== height * 2 || width % 4) {
+  if (stylePreview && (!height || width !== height * 2)) throw Error(`Expected a complete 2:1 PNG style preview; received ${width}×${height}.`);
+  if (!stylePreview && (width < 3840 || width !== height * 2 || width % 4)) {
     throw Error(`Expected a 2:1 PNG at least 3840 pixels wide, divisible by 4; received ${width}×${height}.`);
   }
   return { width, height, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
@@ -23,11 +24,15 @@ export function buildTour(catalog, approvedNodes) {
   const nodes = approvedNodes.map(node => {
     const location = lookup.get(node.id);
     if (!location || ids.has(node.id)) throw Error('Unknown or duplicate approved node: ' + node.id);
-    if (node.image !== `panoramas/${node.id}.png` || !['APPROVED','PREVIEW_ACCEPTED'].includes(node.approval_status)) throw Error('Invalid reviewed image record: ' + node.id);
-    if (node.approval_status === 'PREVIEW_ACCEPTED' && !node.preview_note) throw Error('Preview records require a visible limitation note.');
+    if (node.image !== `panoramas/${node.id}.png` || !['APPROVED','PREVIEW_ACCEPTED','STYLE_PREVIEW_ACCEPTED','DRAFT'].includes(node.approval_status)) throw Error('Invalid reviewed image record: ' + node.id);
+    const stylePreview = node.quality_tier === 'STYLE_PREVIEW';
+    if (stylePreview && (!node.material_note || !['DRAFT','STYLE_PREVIEW_ACCEPTED'].includes(node.approval_status))) throw Error('Style previews require room materials and their own review status.');
+    if (!stylePreview && (node.width < 3840 || node.width % 4 || node.approval_status === 'STYLE_PREVIEW_ACCEPTED')) throw Error('HD records must retain the 3840-pixel minimum and four-strip requirement.');
+    if (!node.height || node.width !== node.height * 2) throw Error('All records must contain complete 2:1 panoramas.');
+    if (node.approval_status !== 'APPROVED' && !node.preview_note) throw Error('Preview records require a visible limitation note.');
     ids.add(node.id);
     return { ...location, ...node, model: location.model, unit: location.unit, label: location.label };
-  }).sort((a,b) => a.id.localeCompare(b.id));
+  }).filter(node => node.approval_status !== 'DRAFT').sort((a,b) => a.id.localeCompare(b.id));
   const models = structuredClone(catalog.models);
   for (const [id,model] of Object.entries(models)) {
     model.ready_count = nodes.filter(n => n.model === id).length;
@@ -42,9 +47,11 @@ async function atomicWrite(file, contents) {
   finally { await fs.unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 
-export async function addApprovedPanorama({ id, image, approved, preview, note, yaw, pitch, thumbnail, replace = false }) {
-  if ((approved === true) === (preview === true)) throw Error('Choose --approved after acceptance, or --preview with --note for a reviewed preview. This script does not certify image quality.');
-  if (preview && !note?.trim()) throw Error('--preview requires a visible limitation in --note.');
+export async function addApprovedPanorama({ id, image, approved, preview, stylePreview, draft = false, note, materials, yaw, pitch, thumbnail, replace = false }) {
+  if ([approved,preview,stylePreview].filter(value => value === true).length !== 1) throw Error('Choose --approved, --preview-accepted (HD), or --style-preview explicitly. This script does not certify image quality.');
+  if ((preview || stylePreview || draft) && !note?.trim()) throw Error('Previews require a visible limitation in --note.');
+  if (stylePreview && !materials?.trim()) throw Error('--style-preview requires room-specific --materials.');
+  if (draft && !stylePreview) throw Error('--draft is reserved for --style-preview.');
   if (yaw !== undefined && !Number.isFinite(Number(yaw))) throw Error('--yaw must be a finite number.');
   if (pitch !== undefined && (!Number.isFinite(Number(pitch)) || Math.abs(Number(pitch)) > 1.5)) throw Error('--pitch must be within -1.5 to 1.5 radians.');
   const catalog = JSON.parse(await fs.readFile(path.join(root,'catalog.json'),'utf8'));
@@ -52,7 +59,7 @@ export async function addApprovedPanorama({ id, image, approved, preview, note, 
   if (!location) throw Error('Unknown room ID: ' + id);
   if (!image) throw Error('--image is required.');
   const bytes = await fs.readFile(path.resolve(image));
-  const info = inspectPanorama(bytes);
+  const info = inspectPanorama(bytes,{stylePreview});
   const lockPath = path.join(root,'.import.lock');
   let lock;
   try { lock = await fs.open(lockPath,'wx'); }
@@ -61,9 +68,11 @@ export async function addApprovedPanorama({ id, image, approved, preview, note, 
     const manifest = JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8'));
     buildTour(catalog,manifest.nodes);
     const previous = manifest.nodes.find(n => n.id === id);
+    if (previous && previous.approval_status !== 'DRAFT' && draft) throw Error('A draft cannot replace a public room.');
     if (previous && previous.sha256 !== info.sha256 && !replace) throw Error('This room already has a different approved image. Pass --replace only after accepting the replacement.');
-    const node = { id, image:`panoramas/${id}.png`, ...info, style:'意式现代', approval_status:preview ? 'PREVIEW_ACCEPTED' : 'APPROVED', revision:info.sha256, reviewed_at:new Date().toISOString() };
-    if (preview) node.preview_note = note.trim();
+    const node = { id, image:`panoramas/${id}.png`, ...info, style:'意式现代', approval_status:draft ? 'DRAFT' : stylePreview ? 'STYLE_PREVIEW_ACCEPTED' : preview ? 'PREVIEW_ACCEPTED' : 'APPROVED', revision:info.sha256, reviewed_at:new Date().toISOString() };
+    if (stylePreview) { node.quality_tier = 'STYLE_PREVIEW'; node.source_model = '内置生图模型'; node.material_note = materials.trim(); }
+    if (note) node.preview_note = note.trim();
     if (yaw !== undefined) node.initial_yaw = Number(yaw);
     if (pitch !== undefined) node.initial_pitch = Number(pitch);
     let thumbnailBytes;
@@ -83,23 +92,25 @@ export async function addApprovedPanorama({ id, image, approved, preview, note, 
     const nextManifest = { schema_version:1,style:'意式现代',nodes:nextNodes.sort((a,b) => a.id.localeCompare(b.id)) };
     await atomicWrite(path.join(root,'manifest.json'),JSON.stringify(nextManifest,null,2)+'\n');
     await atomicWrite(path.join(root,'tour.js'),'window.TOUR = '+JSON.stringify(tour,null,2)+';\n');
-    return { id,width:info.width,height:info.height,sha256:info.sha256,completed:tour.progress.completed,expected:tour.progress.expected,image:node.image };
+    return { id,status:node.approval_status,width:info.width,height:info.height,sha256:info.sha256,completed:tour.progress.completed,expected:tour.progress.expected,image:node.image };
   } finally { await lock.close(); await fs.unlink(lockPath); }
 }
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
-    console.log('node add-approved-panorama.mjs --id standard_02 --image /absolute/original.png (--approved | --preview --note "visible limitation") [--yaw -1.5 --pitch -0.18] [--thumbnail /absolute/thumb.jpg] [--replace]');
+    console.log('node add-approved-panorama.mjs --id ROOM --image /absolute/original.png (--approved | --preview-accepted --note "limitation" | --style-preview --note "limitation" --materials "room materials" [--draft]) [--yaw -1.5 --pitch -0.18] [--thumbnail /absolute/thumb.jpg] [--replace]');
     return;
   }
   const options = {};
   for (let i = 0; i < args.length; i++) {
     const option = args[i];
     if (option === '--approved') options.approved = true;
-    else if (option === '--preview') options.preview = true;
+    else if (option === '--preview' || option === '--preview-accepted') options.preview = true;
+    else if (option === '--style-preview') options.stylePreview = true;
+    else if (option === '--draft') options.draft = true;
     else if (option === '--replace') options.replace = true;
-    else if (['--id','--image','--thumbnail','--note','--yaw','--pitch'].includes(option) && args[i+1] && !args[i+1].startsWith('--')) options[option.slice(2)] = args[++i];
+    else if (['--id','--image','--thumbnail','--note','--materials','--yaw','--pitch'].includes(option) && args[i+1] && !args[i+1].startsWith('--')) options[option.slice(2)] = args[++i];
     else throw Error('Unknown option or missing value: ' + option);
   }
   console.log(JSON.stringify(await addApprovedPanorama(options),null,2));

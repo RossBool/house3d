@@ -4,3 +4,4 @@
 @media(max-width:760px){#empty{top:47%;padding:20px}#empty h2{font-size:18px}.source-links{gap:12px}.source-links a{font-size:11px}.footnote{align-items:flex-start}.footnote>span{display:none!important}#help{max-height:calc(100dvh - 210px);overflow:auto}}
 
 #previewNote{color:#efc6a7;max-width:320px;line-height:1.5}
+.review-link{display:inline-flex;pointer-events:auto;margin-top:12px;padding:9px 12px;border:1px solid #e7c596;border-radius:7px;background:#33291ee8;color:#ffe1b1;text-decoration:none;font-size:12px;line-height:1.4;box-shadow:0 3px 16px #0004}.review-link:hover{background:#55402c}

@@ -24,14 +24,14 @@
     const fragment = `precision highp float;
       varying vec2 v;
       uniform sampler2D panorama0,panorama1,panorama2,panorama3;
-      uniform float stripWidth,yaw,pitch,fov,aspect;
+      uniform float stripWidth,stripCount,yaw,pitch,fov,aspect;
       void main(){
         float cp=cos(pitch),sp=sin(pitch),cy=cos(yaw),sy=sin(yaw);
         vec3 forward=vec3(sy*cp,sp,-cy*cp),right=vec3(cy,0.,sy),up=vec3(-sy*sp,cp,cy*sp);
         vec3 ray=normalize(forward+right*v.x*aspect*tan(fov/2.)+up*v.y*tan(fov/2.));
         vec2 uv=vec2(fract(.5+atan(ray.x,-ray.z)/6.28318530718),.5+asin(clamp(ray.y,-1.,1.))/3.14159265359);
-        float part=floor(uv.x*4.);
-        vec2 sampleUV=vec2((fract(uv.x*4.)*stripWidth+1.)/(stripWidth+2.),uv.y);
+        float part=floor(uv.x*stripCount);
+        vec2 sampleUV=vec2((fract(uv.x*stripCount)*stripWidth+1.)/(stripWidth+2.),uv.y);
         if(part<.5)gl_FragColor=texture2D(panorama0,sampleUV);
         else if(part<1.5)gl_FragColor=texture2D(panorama1,sampleUV);
         else if(part<2.5)gl_FragColor=texture2D(panorama2,sampleUV);
@@ -54,7 +54,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
     const attribute = gl.getAttribLocation(program, 'p');
     gl.enableVertexAttribArray(attribute); gl.vertexAttribPointer(attribute, 2, gl.FLOAT, false, 0, 0);
-    const uniforms = Object.fromEntries(['yaw','pitch','fov','aspect','stripWidth'].map(n => [n, gl.getUniformLocation(program, n)]));
+    const uniforms = Object.fromEntries(['yaw','pitch','fov','aspect','stripWidth','stripCount'].map(n => [n, gl.getUniformLocation(program, n)]));
     const textures = Array.from({ length: 4 }, (_, i) => {
       const texture = gl.createTexture();
       gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -62,13 +62,16 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0]));
       gl.uniform1i(gl.getUniformLocation(program, 'panorama' + i), i);
       return texture;
     });
-    function uploadNativePanorama(image) {
+    function uploadNativePanorama(image, stylePreview) {
       const width = image.naturalWidth, height = image.naturalHeight;
-      if (width < 3840 || width !== height * 2 || width % 4) throw Error('图片未达到完整2:1高清原图规格（至少3840像素宽）。');
-      const stripWidth = width / 4, max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      if (!height || width !== height * 2) throw Error('图片必须为完整2:1全景。');
+      if (!stylePreview && (width < 3840 || width % 4)) throw Error('图片未达到完整2:1高清原图规格（至少3840像素宽）。');
+      const stripCount = width % 4 ? 2 : 4;
+      const stripWidth = width / stripCount, max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
       if (max < height || max < stripWidth + 2) throw Error('当前设备纹理上限不足以按原始像素显示。请使用原图入口或更换设备。');
       const tile = document.createElement('canvas');
       tile.width = stripWidth + 2; tile.height = height;
@@ -76,7 +79,7 @@
       if (!context) throw Error('浏览器无法准备全景纹理。');
       context.imageSmoothingEnabled = false;
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < stripCount; i++) {
         context.drawImage(image, i * stripWidth, 0, stripWidth, height, 1, 0, stripWidth, height);
         context.drawImage(image, (i * stripWidth - 1 + width) % width, 0, 1, height, 0, 0, 1, height);
         context.drawImage(image, ((i + 1) * stripWidth) % width, 0, 1, height, stripWidth + 1, 0, 1, height);
@@ -85,8 +88,9 @@
       }
       if (gl.getError() !== gl.NO_ERROR) throw Error('GPU 无法载入原尺寸纹理。请使用原图入口。');
       gl.uniform1f(uniforms.stripWidth, stripWidth);
+      gl.uniform1f(uniforms.stripCount, stripCount);
       canvas.dataset.sourcePixels = width + '×' + height;
-      canvas.dataset.textureMode = '4 native-resolution strips, no resampling';
+      canvas.dataset.textureMode = stripCount + ' native-resolution strips, no resampling';
       canvas.dataset.maxTextureSize = String(max);
       tile.width = tile.height = 1;
     }
@@ -151,6 +155,8 @@
     $('roomName').textContent = models[model].label + ' / ' + node.label;
     $('previewNote').textContent = node.preview_note || '';
     $('previewNote').hidden = !node.preview_note;
+    $('materialNote').textContent = node.material_note || '暖中性色、胡桃木、浅色石材质感与织物或皮革软包，具体搭配以当前房间原图为准。';
+    $('helpPreviewNote').textContent = node.preview_note || '请以当前房间原图及实际像素为准。';
     $('qualityBadge').textContent = '正在读取完整原图…';
     $('rotate').setAttribute('aria-pressed', 'false');
     for (const id of ['original','download']) { $(id).href = node.image; $(id).hidden = false; }
@@ -162,9 +168,10 @@
       await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(Error('完整原图读取失败：' + node.image)); image.src = node.image; });
       if (mine !== token) return;
       if (image.naturalWidth !== node.width || image.naturalHeight !== node.height) throw Error('原图实际尺寸与导入记录不一致，请重新核对文件。');
-      $('qualityBadge').textContent = `意式${node.approval_status === 'PREVIEW_ACCEPTED' ? '风格预览' : '现代原图'} · ${image.naturalWidth} × ${image.naturalHeight}`;
+      const stylePreview = node.quality_tier === 'STYLE_PREVIEW' && node.approval_status === 'STYLE_PREVIEW_ACCEPTED';
+      $('qualityBadge').textContent = `${stylePreview ? '内置模型风格预览' : '意式风格预览'} · ${image.naturalWidth} × ${image.naturalHeight}${image.naturalWidth < 3840 ? ' · 未达4K' : ''}`;
       if (!renderer) renderer = createRenderer();
-      renderer.uploadNativePanorama(image);
+      renderer.uploadNativePanorama(image, stylePreview);
       yaw = node.initial_yaw || 0; pitch = node.initial_pitch || 0; fov = 75;
       canvas.hidden = false; canvas.dataset.scene = node.id; canvas.dataset.loaded = 'true';
       $('loading').hidden = true; dirty = true; renderMenus();
