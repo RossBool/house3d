@@ -1279,7 +1279,7 @@ window.TOUR = {
       "model": "floor11",
       "unit": "自用",
       "z": 1.58,
-      "initial_yaw": 0,
+      "initial_yaw": -1.05,
       "initial_pitch": 0,
       "label": "独立厨房",
       "map_point": {
@@ -1294,7 +1294,7 @@ window.TOUR = {
       "style": "意式现代",
       "approval_status": "STYLE_PREVIEW_ACCEPTED",
       "revision": "cd839cc2a613da2ddc8e5e6dbaf802c1a9212d84ee9e809485e71bc0ad98e03a",
-      "reviewed_at": "2026-10-13T18:13:56.918Z",
+      "reviewed_at": "2026-10-13T18:23:26.739Z",
       "quality_tier": "STYLE_PREVIEW",
       "source_model": "内置生图模型",
       "material_note": "意式现代｜胡桃木下柜；灰米色哑光吊柜；浅色烧结石台面；不锈钢盆与冰箱；两眼燃气灶；米色地砖。材质为设计拟用说明，非品牌型号或实拍认证。",
