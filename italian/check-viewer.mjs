@@ -11,7 +11,7 @@ const manifest = JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'u
 const source = await fs.readFile(path.join(root,'viewer.js'),'utf8');
 const html = await fs.readFile(path.join(root,'index.html'),'utf8');
 
-async function load(record, { failImage = false, actualWidth = record.width, records = [record], hash = '#'+record.id, tourCatalog = catalog } = {}) {
+async function load(record, { failImage = false, actualWidth = record.width, records = [record], hash = '#'+record.id, tourCatalog = catalog, viewport = [1200,800] } = {}) {
   const copies = [], uploads = [], uniforms = new Map(), frames = [], imageRequests = [];
   const gl = new Proxy({ NO_ERROR:0, getError:() => 0, getParameter:() => 4096,
     getShaderParameter:() => true, getProgramParameter:() => true,
@@ -34,11 +34,11 @@ async function load(record, { failImage = false, actualWidth = record.width, rec
     window:{TOUR:tour}, document:{getElementById:id => elements[id],createElement:tag => new Element(tag),createElementNS:(_,tag) => new Element(tag),body:{classList:{toggle:() => true}}},
     Image:class { set src(value) { imageRequests.push(value); this.naturalWidth = actualWidth; this.naturalHeight = record.height; queueMicrotask(() => failImage ? this.onerror() : this.onload()); } },
     location:{hash},history:{replaceState(){}},addEventListener(){},requestAnimationFrame:fn => frames.push(fn),
-    devicePixelRatio:1,innerWidth:1200,innerHeight:800
+    devicePixelRatio:1,innerWidth:viewport[0],innerHeight:viewport[1]
   });
   await new Promise(resolve => setImmediate(resolve));
   frames.shift()(100);
-  return {elements,copies,uploads,uniforms,imageRequests};
+  return {elements,copies,uploads,uniforms,imageRequests,frame:() => frames.shift()(200)};
 }
 
 const originalURL = item => item.image + '?v=' + encodeURIComponent(item.revision || item.sha256);
@@ -55,6 +55,36 @@ assert.equal(hdResult.elements.map.children[0].children.find(e => e.tagName === 
 const rentalPoint = hdResult.elements.map.children[0].children.find(e => e.tagName === 'circle');
 for (const attribute of ['stroke','stroke-width','pointer-events']) assert.equal(rentalPoint.attributes[attribute],undefined,'Rental hit areas remain unchanged.');
 assert.equal(rentalPoint.attributes.r,'0.36');
+// A true spherical render uses a comfortable starting view, including wide monitors.
+// This fixture only proves viewer behavior, not the contents of a generated scene.
+const rebuilt = {...hd,id:'floor10_02',image:'panoramas/floor10_02.png',render_source:'Blender Cycles',projection:'EQUIRECTANGULAR',approval_status:'PREVIEW_ACCEPTED',preview_note:'尺寸为估算，不用于施工。'};
+for (const viewport of [[1200,800],[3200,900]]) {
+  const result = await load(rebuilt,{viewport});
+  assert.match(result.elements.qualityBadge.textContent,/统一三维场景.*360°/);
+  assert.doesNotMatch(result.elements.qualityBadge.textContent,/内置模型|未达4K/);
+  assert.equal(result.elements.view.dataset.fov,'60');
+  const vertical = result.uniforms.get('fov');
+  const horizontal = 2*Math.atan(Math.tan(vertical/2)*viewport[0]/viewport[1]);
+  assert.ok(horizontal <= 100*Math.PI/180+1e-8,'Wide screens must not start with excessive angular stretching.');
+  assert.equal(result.uploads.length,4);
+  result.elements.zoomIn.onclick();result.frame();
+  assert.ok(result.uniforms.get('fov') < vertical,'Zoom in must change visible FOV even on ultrawide displays.');
+  result.elements.zoomOut.onclick();result.frame();
+  assert.ok(Math.abs(result.uniforms.get('fov')-vertical) < 1e-8,'Zoom out should return to the initial visible angle.');
+}
+const rendered = manifest.nodes.filter(n => n.render_source === 'Blender Cycles');
+if (rendered.length) assert.equal(rendered.length,21,'Publish the two owner floors together after review.');
+for (const item of rendered) {
+  const result = await load(item);
+  assert.equal(item.projection,'EQUIRECTANGULAR');
+  assert.equal(result.elements.view.dataset.loaded,'true');
+  assert.equal(result.elements.view.dataset.sourcePixels,`${item.width}×${item.height}`);
+  assert.match(result.elements.qualityBadge.textContent,/统一三维场景/);
+  assert.equal(result.elements.materialNote.textContent,item.material_note);
+  assert.deepEqual(result.uploads,Array.from({length:4},() => [item.width/4+2,item.height]));
+  assert.ok(Math.abs(result.uniforms.get('yaw')-item.initial_yaw)<1e-8);
+  assert.ok(Math.abs(result.uniforms.get('pitch')-item.initial_pitch)<1e-8);
+}
 for (const item of manifest.nodes.filter(n => n.quality_tier === 'STYLE_PREVIEW')) {
   const accepted = {...item,approval_status:'STYLE_PREVIEW_ACCEPTED'};
   const result = await load(accepted);
@@ -96,7 +126,7 @@ assert.equal(planImage.attributes.width,'768');
 assert.equal(planImage.attributes.height,'1024');
 assert.equal(planImage.attributes.href,catalog.models.floor10.map.image+'?v='+catalog.models.floor10.map.revision);
 assert.equal(defaultResult.elements.planOriginal.hidden,false);
-assert.match(defaultResult.elements.mapNote.textContent,/不代表米制测量/);
+assert.match(defaultResult.elements.mapNote.textContent,/估算.*不能作为精确测量/);
 const hallPoint = planSVG.children.find(e => e.dataset.scene === hall.id);
 const hallLocation = catalog.nodes.find(n => n.id === hall.id);
 assert.equal(Number(hallPoint.attributes.cx),hallLocation.map_point.u*768);
@@ -132,4 +162,4 @@ const staleLocation = buildTour(catalog,[{...kitchen,map_point:{u:0,v:0},x:99,y:
 assert.deepEqual(staleLocation.map_point,catalog.nodes.find(n => n.id === 'floor11_07').map_point,'The catalog owns map coordinates.');
 assert.equal(staleLocation.x,undefined);
 assert.equal(staleLocation.y,undefined);
-console.log(JSON.stringify({status:'PASS',hdCases:1,stylePreviewCases:manifest.nodes.filter(n => n.quality_tier === 'STYLE_PREVIEW').length,mapCases:['rental legacy','floor10 normalized image','floor11 new kitchen fixture','map click navigation','catalog start','image revision URLs'],browserGpuVisualRendering:'NOT RUN'},null,2));
+console.log(JSON.stringify({status:'PASS',hdCases:1+rendered.length,rebuiltSceneCases:rendered.length,zoomCases:['normal','ultrawide'],stylePreviewCases:manifest.nodes.filter(n => n.quality_tier === 'STYLE_PREVIEW').length,mapCases:['rental legacy','floor10 normalized image','floor11 new kitchen fixture','map click navigation','catalog start','image revision URLs'],browserGpuVisualRendering:'NOT RUN'},null,2));

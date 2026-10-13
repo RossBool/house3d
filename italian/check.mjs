@@ -84,6 +84,6 @@ const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
 assert.equal(new Set(ids).size,ids.length,'Unique HTML ids');
 for (const match of viewer.matchAll(/\$\('([^']+)'\)/g)) assert.ok(ids.includes(match[1]),`Missing HTML element ${match[1]}`);
 for (const name of ['viewer.css','viewer.js','tour.js']) await fs.access(path.join(root,name));
-assert.ok(html.includes('1774×887') && html.includes('未达原生4K') && html.includes('不能作为精确测量'));
+assert.ok(html.includes('统一三维场景') && html.includes('实际像素') && html.includes('不能作为精确测量'));
 assert.ok(!/setInterval|VR_TOUR_UPDATE|轻奢|新中式/.test(viewer));
 console.log(JSON.stringify({status:'PASS',rooms:tour.nodes.length,drafts:manifest.nodes.filter(n => n.approval_status === 'DRAFT').length,total:42,checks:['manifest/tour agreement','original PNG metadata and SHA','new plan image hashes and normalized points','rental legacy geometry retained','HD gate retained','DRAFT excluded from public tour','preview limitations','reject duplicate/unknown/legacy image records','empty state data','HTML element references'],browser:'NOT RUN'},null,2));

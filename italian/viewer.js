@@ -8,6 +8,10 @@
   let current = null, model = 'standard', unit = 'A';
   let yaw = 0, pitch = 0, fov = 75, auto = false, token = 0, dirty = true, last = 0;
   let renderer = null;
+  const rebuiltScene = node => node?.render_source === 'Blender Cycles';
+  const initialFov = node => rebuiltScene(node) ? 60 : 75;
+  const maximumFov = () => rebuiltScene(current) ? Math.min(80, 2 * Math.atan(Math.tan(50 * Math.PI / 180) / (innerWidth / innerHeight)) * 180 / Math.PI) : 100;
+  const visibleFov = () => Math.min(fov, maximumFov());
 
   function showError(message) {
     $('error').textContent = message;
@@ -101,7 +105,10 @@
         canvas.width = width; canvas.height = height; gl.viewport(0, 0, width, height);
       }
       gl.uniform1f(uniforms.yaw, yaw); gl.uniform1f(uniforms.pitch, pitch);
-      gl.uniform1f(uniforms.fov, fov * Math.PI / 180); gl.uniform1f(uniforms.aspect, width / height);
+      const aspect = width / height;
+      const naturalFov = visibleFov();
+      gl.uniform1f(uniforms.fov, naturalFov * Math.PI / 180); gl.uniform1f(uniforms.aspect, aspect);
+      canvas.dataset.effectiveFov = naturalFov.toFixed(2);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
     return { uploadNativePanorama, draw };
@@ -203,10 +210,11 @@
       if (mine !== token) return;
       if (image.naturalWidth !== node.width || image.naturalHeight !== node.height) throw Error('原图实际尺寸与导入记录不一致，请重新核对文件。');
       const stylePreview = node.quality_tier === 'STYLE_PREVIEW' && node.approval_status === 'STYLE_PREVIEW_ACCEPTED';
-      $('qualityBadge').textContent = `${stylePreview ? '内置模型风格预览' : '意式风格预览'} · ${image.naturalWidth} × ${image.naturalHeight}${image.naturalWidth < 3840 ? ' · 未达4K' : ''}`;
+      const imageKind = rebuiltScene(node) ? '统一三维场景 · 360°环视' : stylePreview ? '内置模型风格预览' : '意式风格预览';
+      $('qualityBadge').textContent = `${imageKind} · ${image.naturalWidth} × ${image.naturalHeight}${!rebuiltScene(node) && image.naturalWidth < 3840 ? ' · 未达4K' : ''}`;
       if (!renderer) renderer = createRenderer();
       renderer.uploadNativePanorama(image, stylePreview);
-      yaw = node.initial_yaw || 0; pitch = node.initial_pitch || 0; fov = 75;
+      yaw = node.initial_yaw || 0; pitch = node.initial_pitch || 0; fov = initialFov(node);
       canvas.hidden = false; canvas.dataset.scene = node.id; canvas.dataset.loaded = 'true';
       $('loading').hidden = true; dirty = true; renderMenus();
     } catch (error) {
@@ -214,7 +222,10 @@
     }
   }
   function move(delta) { const list = filtered(); if (list.length) enter(list[(list.findIndex(n => n.id === current?.id) + delta + list.length) % list.length]); }
-  function zoom(delta) { fov = Math.max(40, Math.min(100, fov + delta)); dirty = true; }
+  function zoom(delta) {
+    const maximum = maximumFov(), minimum = rebuiltScene(current) ? Math.min(40, maximum / 2) : 40;
+    fov = Math.max(minimum, Math.min(maximum, visibleFov() + delta)); dirty = true;
+  }
   $('previous').onclick = () => move(-1); $('next').onclick = () => move(1);
   $('zoomIn').onclick = () => zoom(-8); $('zoomOut').onclick = () => zoom(8);
   $('rotate').onclick = () => { auto = !auto; $('rotate').setAttribute('aria-pressed', String(auto)); };
@@ -229,7 +240,7 @@
     if (!pointers.has(e.pointerId)) return;
     const old = pointers.get(e.pointerId); pointers.set(e.pointerId, { x:e.clientX,y:e.clientY });
     if (pointers.size === 2) { const [a,b] = [...pointers.values()], distance = Math.hypot(a.x-b.x,a.y-b.y); if (pinch) zoom((pinch-distance)*.12); pinch = distance; }
-    else { const speed = fov*Math.PI/180/canvas.clientHeight; yaw -= (e.clientX-old.x)*speed; pitch = Math.max(-1.5,Math.min(1.5,pitch+(e.clientY-old.y)*speed)); dirty = true; }
+    else { const speed = visibleFov()*Math.PI/180/canvas.clientHeight; yaw -= (e.clientX-old.x)*speed; pitch = Math.max(-1.5,Math.min(1.5,pitch+(e.clientY-old.y)*speed)); dirty = true; }
   };
   canvas.onpointerup = canvas.onpointercancel = e => { pointers.delete(e.pointerId); pinch = 0; };
   canvas.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY*.035); }, { passive:false });
@@ -239,7 +250,7 @@
     if (e.key === 'ArrowLeft') yaw -= .1; if (e.key === 'ArrowRight') yaw += .1;
     if (e.key === 'ArrowUp') pitch = Math.min(1.5,pitch+.1); if (e.key === 'ArrowDown') pitch = Math.max(-1.5,pitch-.1);
     if (['+','='].includes(e.key)) zoom(-5); if (e.key === '-') zoom(5);
-    if (e.key === 'Home') { yaw = current.initial_yaw || 0; pitch = current.initial_pitch || 0; fov = 75; } dirty = true;
+    if (e.key === 'Home') { yaw = current.initial_yaw || 0; pitch = current.initial_pitch || 0; fov = initialFov(current); } dirty = true;
   };
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); renderer = null; canvas.hidden = true; canvas.dataset.loaded = 'false'; showError('显卡连接中断，请刷新页面；原图链接仍可使用。'); renderMenus(); });
   addEventListener('resize', () => { dirty = true; });

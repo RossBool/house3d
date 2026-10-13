@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="description" content="依据最新标注户型更新10层、11层意式现代自用住宅全景预览，出租公寓保留原方案。">
   <title>意式现代 · 全屋全景</title>
-  <link rel="stylesheet" href="viewer.css?v=20261014-solid-wall">
-  <script src="tour.js?v=20261014-solid-wall" defer></script>
-  <script src="viewer.js?v=20261014-solid-wall" defer></script>
+  <link rel="stylesheet" href="viewer.css?v=20261014-unified-scene">
+  <script src="tour.js?v=20261014-unified-scene" defer></script>
+  <script src="viewer.js?v=20261014-unified-scene" defer></script>
 </head>
 <body>
   <canvas id="view" tabindex="0" aria-label="360度全景。拖动环视，滚轮缩放，也可使用方向键。"></canvas>
@@ -21,9 +21,9 @@
   <div id="loading" role="status" aria-live="polite" hidden><i></i><span>正在加载完整全景…</span></div>
   <div id="error" role="alert" hidden></div>
   <aside id="mapPanel" class="panel" hidden><div class="panelhead"><h2>视点示意 · 点击选点</h2><button id="mapClose" aria-label="关闭平面图">×</button></div><div id="map"></div><p id="mapNote">只显示实际已接入的意式视点</p></aside>
-  <aside id="help" class="panel" hidden><div class="panelhead"><h2>意式现代 · 当前房间材质</h2><button id="helpClose" aria-label="关闭说明">×</button></div><p id="materialNote">具体搭配以当前房间原图为准。</p><p id="helpPreviewNote">风格预览，以当前房间实际像素为准。</p><p>鼠标或单指拖动环视；滚轮或双指缩放。点击房间或平面图圆点切换。方向键环视，＋／− 缩放，Home 回到初始角度。</p><p class="muted">本轮按2026-10-14标注户型更新10层和11层；2–9层出租方案保留。内置模型1774×887图片为风格预览，未达原生4K。新图导航位置仅作示意，不能作为精确测量；生成图仍需核对空间几何与球面接缝。完整原图支持单目360°环视，不代表施工验收。</p></aside>
-  <div id="orientation"><span id="bearing">图上</span><div class="compass"><i id="needle"></i></div></div>
+  <aside id="help" class="panel" hidden><div class="panelhead"><h2>意式现代 · 当前房间材质</h2><button id="helpClose" aria-label="关闭说明">×</button></div><p id="materialNote">具体搭配以当前房间原图为准。</p><p id="helpPreviewNote">风格预览，以当前房间实际像素为准。</p><p>鼠标或单指拖动环视；滚轮或双指缩放。点击房间或平面图圆点切换。方向键环视，＋／− 缩放，Home 回到初始角度。</p><p class="muted">本轮按2026-10-14标注户型更新10层和11层；2–9层出租方案保留。10层与11层从各自统一三维场景输出360°环视。以能看清及空间关系合理为验收目标，实际像素见当前图片标注。比例与家具净距仍含估算，不能作为精确测量；露台未提供完整边界。出租层保留既有预览。单目环视不代表立体头显或施工验收。</p></aside>
+  <div id="orientation"><span id="bearing">环视角度</span><div class="compass"><i id="needle"></i></div></div>
   <div id="tools" aria-label="全景控制"><button id="mapToggle" title="打开平面图">⌖<span>平面图</span></button><button id="rotate" aria-pressed="false" title="自动环视">↻<span>自动环视</span></button><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">−</button><button id="fullscreen" aria-label="全屏查看">⛶</button><button id="trayToggle" aria-pressed="true" title="显示或收起房间">▦<span>房间</span></button></div>
-  <footer id="tray"><div class="traytop"><div id="units" aria-label="选择公寓"></div><span id="counter">0 个可浏览视点</span></div><div class="roomrow"><button id="previous" aria-label="上一个房间" disabled>‹</button><div id="rooms" aria-label="选择房间"></div><button id="next" aria-label="下一个房间" disabled>›</button></div><div class="footnote"><span>拖动环视 · 点击房间切换</span><div class="source-links"><a id="original" hidden target="_blank" rel="noopener">查看完整原图</a><a id="download" hidden download>下载原图</a><a href="../panorama/">既有全景</a></div></div></footer>
+  <footer id="tray"><div class="traytop"><div id="units" aria-label="选择公寓"></div><span id="counter">0 个可浏览视点</span></div><div class="roomrow"><button id="previous" aria-label="上一个房间" disabled>‹</button><div id="rooms" aria-label="选择房间"></div><button id="next" aria-label="下一个房间" disabled>›</button></div><div class="footnote"><span>拖动环视 · 点击房间切换</span><div class="source-links"><a href="structure.html" target="_blank" rel="noopener">平面与门窗核对</a><a id="original" hidden target="_blank" rel="noopener">查看完整原图</a><a id="download" hidden download>下载原图</a><a href="../panorama/">既有全景</a></div></div></footer>
 </body>
 </html>

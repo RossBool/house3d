@@ -1,0 +1,324 @@
+[
+  {
+    "floor": "floor10",
+    "status": "PASS_SCOPED",
+    "scene_sha256": "9c2eb9c40ea4f0c1e3f7c6fcbe7b517ed88817e1459d156cb90221ddfeb712ed",
+    "checks": [
+      {
+        "check": "camera_inventory",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_00",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_01",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_02",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_03",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_04",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_05",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_06",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_07",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_08",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_09",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_10",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_11",
+        "status": "PASS"
+      },
+      {
+        "check": "floor10_12",
+        "status": "PASS"
+      },
+      {
+        "check": "bedroom1_bedroom2_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "bedroom2_bedroom3_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "bathroom2_bedroom3_has_no_door",
+        "status": "PASS"
+      },
+      {
+        "check": "bedroom4_hall_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "living_master_tv_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "bathroom3_closet_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "master_wc_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "bedroom1_to_bathroom1",
+        "status": "PASS"
+      },
+      {
+        "check": "bedroom2_to_bathroom2",
+        "status": "PASS"
+      },
+      {
+        "check": "bathroom3_to_external_washbasin_zone",
+        "status": "PASS"
+      },
+      {
+        "check": "bed1_to_bath1",
+        "status": "PASS"
+      },
+      {
+        "check": "hall_to_bed2",
+        "status": "PASS"
+      },
+      {
+        "check": "bed2_to_bath2",
+        "status": "PASS"
+      },
+      {
+        "check": "hall_to_bed3",
+        "status": "PASS"
+      },
+      {
+        "check": "hall_to_bed4",
+        "status": "PASS"
+      },
+      {
+        "check": "hall_to_bath3_dry",
+        "status": "PASS"
+      },
+      {
+        "check": "bath3_dry_to_wet",
+        "status": "PASS"
+      },
+      {
+        "check": "master_to_closet",
+        "status": "PASS"
+      },
+      {
+        "check": "living_to_master",
+        "status": "PASS"
+      },
+      {
+        "check": "master_to_bath",
+        "status": "PASS"
+      },
+      {
+        "check": "master_bath_to_shower",
+        "status": "PASS"
+      },
+      {
+        "check": "foyer_to_bed1",
+        "status": "PASS"
+      },
+      {
+        "check": "foyer_to_hall",
+        "status": "PASS"
+      },
+      {
+        "check": "lift_door",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "top_floor_constraints",
+        "status": "NOT APPLICABLE"
+      },
+      {
+        "check": "input_files_unmodified",
+        "status": "PASS"
+      },
+      {
+        "check": "rendered_visual_quality_and_spherical_projection",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "full_wall_junction_and_measured_building_accuracy",
+        "status": "NOT RUN"
+      }
+    ]
+  },
+  {
+    "floor": "floor11",
+    "status": "PASS_SCOPED",
+    "scene_sha256": "3f8d5cd9351fc23a9cbabbc10786f566c49c34229603780c8016e7ec7e42e6e2",
+    "checks": [
+      {
+        "check": "camera_inventory",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_00",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_01",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_02",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_03",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_04",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_05",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_06",
+        "status": "PASS"
+      },
+      {
+        "check": "floor11_07",
+        "status": "PASS"
+      },
+      {
+        "check": "kitchen_west_solid_wall",
+        "status": "PASS"
+      },
+      {
+        "check": "reception_west_partition",
+        "status": "PASS"
+      },
+      {
+        "check": "stairwell_enclosing_wall",
+        "status": "PASS"
+      },
+      {
+        "check": "lift_enclosing_wall",
+        "status": "PASS"
+      },
+      {
+        "check": "confirmed_full_height_return_wall",
+        "status": "PASS"
+      },
+      {
+        "check": "dining_to_enclosed_kitchen",
+        "status": "PASS"
+      },
+      {
+        "check": "tea_room_to_terrace_is_door",
+        "status": "PASS"
+      },
+      {
+        "check": "F11_TEA_TERRACE_DOOR",
+        "status": "PASS"
+      },
+      {
+        "check": "F11_FOYER_TERRACE_DOOR",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "F11_BATH_DOOR",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "F11_SHOWER_DOOR",
+        "status": "PASS"
+      },
+      {
+        "check": "F11_GUEST_DOOR",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "F11_KITCHEN_DOOR",
+        "status": "PASS"
+      },
+      {
+        "check": "F11_RECEPTION_DOOR",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "F11_STAIR_HOUSE_DOOR",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "F11_LIFT_CLOSED_DOOR",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "no_stair_flight_above_top_floor",
+        "status": "PASS"
+      },
+      {
+        "check": "kitchen_cannot_see_stairs",
+        "status": "PASS"
+      },
+      {
+        "check": "kitchen_cannot_see_lift",
+        "status": "PASS"
+      },
+      {
+        "check": "dining_cannot_see_stairs",
+        "status": "PASS"
+      },
+      {
+        "check": "dining_cannot_see_lift",
+        "status": "PASS"
+      },
+      {
+        "check": "wine_hall_cannot_see_stairs",
+        "status": "PASS"
+      },
+      {
+        "check": "wine_hall_cannot_see_lift",
+        "status": "PASS"
+      },
+      {
+        "check": "input_files_unmodified",
+        "status": "PASS"
+      },
+      {
+        "check": "rendered_visual_quality_and_spherical_projection",
+        "status": "NOT RUN"
+      },
+      {
+        "check": "full_wall_junction_and_measured_building_accuracy",
+        "status": "NOT RUN"
+      }
+    ]
+  }
+]
