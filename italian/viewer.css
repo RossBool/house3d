@@ -5,3 +5,4 @@
 
 #previewNote{color:#efc6a7;max-width:320px;line-height:1.5}
 .review-link{display:inline-flex;pointer-events:auto;margin-top:12px;padding:9px 12px;border:1px solid #e7c596;border-radius:7px;background:#33291ee8;color:#ffe1b1;text-decoration:none;font-size:12px;line-height:1.4;box-shadow:0 3px 16px #0004}.review-link:hover{background:#55402c}
+#map svg[data-map-type="plan-image"]{background:#fff;border-radius:3px}#map circle.point:hover,#map circle.point:focus-visible{fill:#e2ad55}#map svg[data-map-type="legacy-walls"] circle.point:hover,#map svg[data-map-type="legacy-walls"] circle.point:focus-visible{stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke}#mapNote{line-height:1.6}

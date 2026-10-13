@@ -108,6 +108,10 @@
   }
 
   const filtered = () => nodes.filter(n => n.model === model && n.unit === unit);
+  function revisedURL(source, revision) {
+    if (!revision || /^(data:|blob:)/.test(source)) return source;
+    return source + (source.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(revision);
+  }
   function button(label, action) {
     const b = document.createElement('button'); b.textContent = label; b.onclick = action; return b;
   }
@@ -127,7 +131,7 @@
     $('counter').textContent = list.length ? `${Math.max(0, list.findIndex(n => n.id === current?.id) + 1)} / ${list.length} 个可浏览视点` : '0 个可浏览视点';
     $('rooms').replaceChildren(...list.map(n => {
       const b = button('', () => enter(n)); b.className = 'room'; b.setAttribute('aria-pressed', String(n.id === current?.id));
-      if (n.thumbnail) { const image = document.createElement('img'); image.src = n.thumbnail; image.alt = ''; image.loading = 'lazy'; b.append(image); }
+      if (n.thumbnail) { const image = document.createElement('img'); image.src = revisedURL(n.thumbnail,n.revision); image.alt = ''; image.loading = 'lazy'; b.append(image); }
       const label = document.createElement('span'); label.textContent = n.label; b.append(label); return b;
     }));
     $('previous').disabled = $('next').disabled = list.length < 2;
@@ -135,14 +139,35 @@
   }
   function renderMap() {
     const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '-0.5 -0.5 13.1 22.5');
+    const map = models[model].map;
+    const planImage = map?.type === 'plan-image';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', planImage ? `0 0 ${map.width} ${map.height}` : '-0.5 -0.5 13.1 22.5');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.setAttribute('aria-label', models[model].label + '视点导航');
+    svg.dataset.mapType = planImage ? 'plan-image' : 'legacy-walls';
     const add = (tag, attrs) => { const e = document.createElementNS(ns, tag); Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,v)); svg.append(e); return e; };
-    add('rect', { x:0,y:0,width:12.1,height:21.5,fill:'#e9e2d4' });
-    for (const w of models[model].walls) add('line', { x1:w[0],y1:w[1],x2:w[2],y2:w[3],stroke:w[5] || '#6e6557','stroke-width':w[4] });
+    if (planImage) {
+      add('image', { x:0,y:0,width:map.width,height:map.height,href:revisedURL(map.image,map.revision),preserveAspectRatio:'xMidYMid meet' });
+    } else {
+      add('rect', { x:0,y:0,width:12.1,height:21.5,fill:'#e9e2d4' });
+      for (const w of models[model].walls) add('line', { x1:w[0],y1:w[1],x2:w[2],y2:w[3],stroke:w[5] || '#6e6557','stroke-width':w[4] });
+    }
     for (const n of nodes.filter(n => n.model === model)) {
-      const point = add('circle', { cx:n.x,cy:n.y,r:n.id === current?.id ? .36 : .26,fill:n.id === current?.id ? '#aa6834' : '#3e746b',tabindex:0,role:'button','aria-label':n.label,class:'point' });
+      const selected = n.id === current?.id;
+      const x = planImage ? n.map_point.u * map.width : n.x;
+      const y = planImage ? n.map_point.v * map.height : n.y;
+      const radius = planImage ? map.width * (selected ? .012 : .009) : selected ? .36 : .26;
+      const point = add('circle', { cx:x,cy:y,r:radius,fill:selected ? '#aa6834' : '#3e746b',tabindex:0,role:'button','aria-label':n.label,'aria-pressed':String(selected),class:'point' });
+      if (planImage) {
+        point.setAttribute('stroke', 'transparent');
+        point.setAttribute('stroke-width', map.width * .055);
+        point.setAttribute('pointer-events', 'all');
+      }
+      point.dataset.scene = n.id;
       point.onclick = () => enter(n); point.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); enter(n); } };
     }
+    $('mapNote').textContent = planImage ? map.note : '只显示实际已接入的意式视点';
     $('map').replaceChildren(svg);
   }
   async function enter(node) {
@@ -159,13 +184,17 @@
     $('helpPreviewNote').textContent = node.preview_note || '请以当前房间原图及实际像素为准。';
     $('qualityBadge').textContent = '正在读取完整原图…';
     $('rotate').setAttribute('aria-pressed', 'false');
-    for (const id of ['original','download']) { $(id).href = node.image; $(id).hidden = false; }
+    const imageURL = revisedURL(node.image,node.revision || node.sha256);
+    for (const id of ['original','download']) { $(id).href = imageURL; $(id).hidden = false; }
+    const map = models[model].map;
+    $('planOriginal').hidden = map?.type !== 'plan-image';
+    if (map?.type === 'plan-image') $('planOriginal').href = revisedURL(map.image,map.revision);
     $('download').download = `${node.id}_意式现代_${node.width}x${node.height}.png`;
     renderMenus(); renderMap();
     history.replaceState(null, '', '#' + node.id);
     try {
       const image = new Image();
-      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(Error('完整原图读取失败：' + node.image)); image.src = node.image; });
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(Error('完整原图读取失败：' + node.image)); image.src = imageURL; });
       if (mine !== token) return;
       if (image.naturalWidth !== node.width || image.naturalHeight !== node.height) throw Error('原图实际尺寸与导入记录不一致，请重新核对文件。');
       const stylePreview = node.quality_tier === 'STYLE_PREVIEW' && node.approval_status === 'STYLE_PREVIEW_ACCEPTED';
@@ -223,6 +252,6 @@
   renderMenus(); renderMap(); canvas.hidden = true;
   let requested = '';
   try { requested = decodeURIComponent(location.hash.slice(1)); } catch { /* A malformed bookmark falls back to the first approved room. */ }
-  enter(nodes.find(n => n.id === requested) || nodes.find(n => n.id === 'standard_02') || nodes[0]);
+  enter(nodes.find(n => n.id === requested) || nodes.find(n => n.id === tour.start) || nodes[0]);
   requestAnimationFrame(frame);
 })();

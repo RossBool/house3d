@@ -21,6 +21,8 @@ export function inspectPanorama(bytes, { stylePreview = false } = {}) {
 export function buildTour(catalog, approvedNodes) {
   const ids = new Set();
   const lookup = new Map(catalog.nodes.map(n => [n.id,n]));
+  const start = catalog.start || 'standard_02';
+  if (!lookup.has(start)) throw Error('Unknown catalog start node: ' + start);
   const nodes = approvedNodes.map(node => {
     const location = lookup.get(node.id);
     if (!location || ids.has(node.id)) throw Error('Unknown or duplicate approved node: ' + node.id);
@@ -30,15 +32,25 @@ export function buildTour(catalog, approvedNodes) {
     if (!stylePreview && (node.width < 3840 || node.width % 4 || node.approval_status === 'STYLE_PREVIEW_ACCEPTED')) throw Error('HD records must retain the 3840-pixel minimum and four-strip requirement.');
     if (!node.height || node.width !== node.height * 2) throw Error('All records must contain complete 2:1 panoramas.');
     if (node.approval_status !== 'APPROVED' && !node.preview_note) throw Error('Preview records require a visible limitation note.');
+    const map = catalog.models[location.model]?.map;
+    if (map?.type === 'plan-image') {
+      if (!map.image || !(map.width > 0 && map.height > 0)) throw Error('Invalid plan-image map: ' + location.model);
+      if (![location.map_point?.u,location.map_point?.v].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) throw Error('Invalid normalized plan point: ' + node.id);
+    }
     ids.add(node.id);
-    return { ...location, ...node, model: location.model, unit: location.unit, label: location.label };
+    const record = { ...location, ...node, model: location.model, unit: location.unit, label: location.label };
+    if (map?.type === 'plan-image') {
+      record.map_point = { ...location.map_point };
+      delete record.x; delete record.y;
+    }
+    return record;
   }).filter(node => node.approval_status !== 'DRAFT').sort((a,b) => a.id.localeCompare(b.id));
   const models = structuredClone(catalog.models);
   for (const [id,model] of Object.entries(models)) {
     model.ready_count = nodes.filter(n => n.model === id).length;
     for (const [unit,count] of Object.entries(model.units)) count.ready = nodes.filter(n => n.model === id && n.unit === unit).length;
   }
-  return { models, nodes, start: 'standard_02', style: '意式现代', progress: { completed: nodes.length, expected: catalog.nodes.length, status: nodes.length ? (nodes.length === catalog.nodes.length ? 'COMPLETE' : 'PARTIAL') : 'WAITING_FOR_APPROVED_IMAGES' } };
+  return { models, nodes, start, style: '意式现代', progress: { completed: nodes.length, expected: catalog.nodes.length, status: nodes.length ? (nodes.length === catalog.nodes.length ? 'COMPLETE' : 'PARTIAL') : 'WAITING_FOR_APPROVED_IMAGES' } };
 }
 
 async function atomicWrite(file, contents) {
