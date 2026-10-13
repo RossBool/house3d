@@ -149,6 +149,11 @@
     const add = (tag, attrs) => { const e = document.createElementNS(ns, tag); Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,v)); svg.append(e); return e; };
     if (planImage) {
       add('image', { x:0,y:0,width:map.width,height:map.height,href:revisedURL(map.image,map.revision),preserveAspectRatio:'xMidYMid meet' });
+      if (map.confirmed_wall) {
+        const wall = map.confirmed_wall;
+        const outline = add('rect', { x:wall.u*map.width,y:wall.v*map.height,width:wall.width*map.width,height:wall.height*map.height,fill:'#fff',stroke:'#555','stroke-width':8,'aria-label':wall.label });
+        outline.dataset.annotation = 'confirmed-full-height-wall';
+      }
     } else {
       add('rect', { x:0,y:0,width:12.1,height:21.5,fill:'#e9e2d4' });
       for (const w of models[model].walls) add('line', { x1:w[0],y1:w[1],x2:w[2],y2:w[3],stroke:w[5] || '#6e6557','stroke-width':w[4] });
@@ -188,7 +193,7 @@
     for (const id of ['original','download']) { $(id).href = imageURL; $(id).hidden = false; }
     const map = models[model].map;
     $('planOriginal').hidden = map?.type !== 'plan-image';
-    if (map?.type === 'plan-image') $('planOriginal').href = revisedURL(map.image,map.revision);
+    if (map?.type === 'plan-image') $('planOriginal').href = revisedURL(map.source_image || map.image,map.source_revision || map.revision);
     $('download').download = `${node.id}_意式现代_${node.width}x${node.height}.png`;
     renderMenus(); renderMap();
     history.replaceState(null, '', '#' + node.id);

@@ -749,7 +749,16 @@ window.TOUR = {
         "width": 1302,
         "height": 1736,
         "revision": "864ba650bc681c1015f1d4e3f80774e8886ded436db999d7e63b125c8660fc74",
-        "note": "按用户2026-10-14新图定位；坐标仅表示图上位置，不代表米制测量。"
+        "note": "按新户型图定位；餐厅下沿灰色短墙已确认为到顶实体墙，左侧保留通行。图上位置不代表米制测量。",
+        "confirmed_wall": {
+          "u": 0.4731182795698925,
+          "v": 0.3640552995391705,
+          "width": 0.09523809523809523,
+          "height": 0.021889400921658985,
+          "label": "用户确认的到顶实体短墙，左侧保留通行口"
+        },
+        "source_image": "plans/20261014/floor11-labeled.png",
+        "source_revision": "63f15decfbe55bee4750db754547c012857a8df181d8ba747a0a7236baf7e735"
       }
     }
   },
@@ -1159,16 +1168,16 @@ window.TOUR = {
       "image": "panoramas/floor11_02.png",
       "width": 1774,
       "height": 887,
-      "bytes": 1972908,
-      "sha256": "31b1bd61f8706bb8bed605f1aef8aed62b478b95a0d8f0b47749154dba5a46f3",
+      "bytes": 1952197,
+      "sha256": "0b7598e1d1ae8fbcd8ba29d7c8e43c61eb9c97d9aec469df6af062d79bf7c110",
       "style": "意式现代",
       "approval_status": "STYLE_PREVIEW_ACCEPTED",
-      "revision": "31b1bd61f8706bb8bed605f1aef8aed62b478b95a0d8f0b47749154dba5a46f3",
-      "reviewed_at": "2026-10-13T18:13:56.886Z",
+      "revision": "0b7598e1d1ae8fbcd8ba29d7c8e43c61eb9c97d9aec469df6af062d79bf7c110",
+      "reviewed_at": "2026-10-13T18:39:56.557Z",
       "quality_tier": "STYLE_PREVIEW",
       "source_model": "内置生图模型",
       "material_note": "意式现代｜胡桃木餐桌及餐边柜；灰褐色皮革餐椅；胡桃木地板；米色瓷砖；古铜色框钢化玻璃移门。材质为设计拟用说明，非品牌型号或实拍认证。",
-      "preview_note": "依2026-10-14新户型及功能标注生成的意式现代风格预览；原生1774×887，未达4K。精确空间几何、跨视点一致性及球面接缝未认证。"
+      "preview_note": "依最新户型及标注更新：餐厅入口保留到顶实体短墙，左侧通行。实际1774×887，未达原生4K；精确尺寸、跨视点一致性及球面接缝未认证。"
     },
     {
       "id": "floor11_03",
@@ -1237,16 +1246,16 @@ window.TOUR = {
       "image": "panoramas/floor11_05.png",
       "width": 1774,
       "height": 887,
-      "bytes": 2123856,
-      "sha256": "a96194d8c38d9a0467cfff01c723fb407c8755410d21d3694459c21970707b27",
+      "bytes": 1971707,
+      "sha256": "c5e19f3edff8db3e1259c08a9781090e8a681f781351db8ce0f43cfe132e859c",
       "style": "意式现代",
       "approval_status": "STYLE_PREVIEW_ACCEPTED",
-      "revision": "a96194d8c38d9a0467cfff01c723fb407c8755410d21d3694459c21970707b27",
-      "reviewed_at": "2026-10-13T18:13:56.905Z",
+      "revision": "c5e19f3edff8db3e1259c08a9781090e8a681f781351db8ce0f43cfe132e859c",
+      "reviewed_at": "2026-10-13T18:39:56.576Z",
       "quality_tier": "STYLE_PREVIEW",
       "source_model": "内置生图模型",
       "material_note": "意式现代｜胡桃木酒柜及地板；古铜金属门框；钢化玻璃柜门；暖白灯带；米色哑光墙面。材质为设计拟用说明，非品牌型号或实拍认证。",
-      "preview_note": "依2026-10-14新户型及功能标注生成的意式现代风格预览；原生1774×887，未达4K。精确空间几何、跨视点一致性及球面接缝未认证。 酒柜所在墙面与尺寸为方案示意，待确认。"
+      "preview_note": "依最新户型及标注更新：餐厅入口保留到顶实体短墙，左侧通行。实际1774×887，未达原生4K；精确尺寸、跨视点一致性及球面接缝未认证。 酒柜具体落位仍为示意。"
     },
     {
       "id": "floor11_06",

@@ -24,6 +24,10 @@ for (const [model,count] of [['floor10',13],['floor11',8]]) {
   assert.equal(catalog.nodes.filter(n => n.model === model).length,count);
   const bytes = await fs.readFile(path.join(root,definition.map.image));
   assert.equal(createHash('sha256').update(bytes).digest('hex'),definition.map.revision);
+  if (definition.map.source_image) {
+    const source = await fs.readFile(path.join(root,definition.map.source_image));
+    assert.equal(createHash('sha256').update(source).digest('hex'),definition.map.source_revision);
+  }
   for (const node of catalog.nodes.filter(n => n.model === model)) {
     assert.ok([node.map_point.u,node.map_point.v].every(value => Number.isFinite(value) && value >= 0 && value <= 1));
     assert.equal(node.x,undefined,'New plan maps must not retain ambiguous meter coordinates.');
@@ -31,6 +35,8 @@ for (const [model,count] of [['floor10',13],['floor11',8]]) {
   }
 }
 assert.equal(catalog.nodes.find(n => n.id === 'floor11_07').label,'独立厨房');
+assert.match(catalog.models.floor11.map.confirmed_wall.label,/到顶实体/);
+assert.ok(catalog.models.floor11.map.confirmed_wall.u > catalog.nodes.find(n => n.id === 'floor11_05').map_point.u,'Keep the corridor passage to the left of the short wall.');
 assert.equal(catalog.models.standard.map,undefined,'Rental maps keep the legacy geometry branch.');
 assert.equal(catalog.nodes.filter(n => n.model === 'standard').length,21);
 assert.equal(new Set(tour.nodes.map(n => n.sha256)).size,tour.nodes.length,'Each published room must have its own image.');
