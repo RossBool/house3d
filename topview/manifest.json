@@ -1,0 +1,64 @@
+{
+  "title": "各楼层3D实景渲染俯视图",
+  "status": "COMPLETE_ARTIFACT",
+  "date": "2026-10-14",
+  "source": "outputs/公寓与自用住宅修正版/ 三份修正版模型及轴测渲染",
+  "views": [
+    {
+      "id": "standard_2_9",
+      "floors": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "label": "2–9层标准出租层",
+      "apartments": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "image": "standard-2-9-俯视图.png",
+      "pixels": "1800×1800",
+      "bytes": 3462702,
+      "sha256": "7009ab87f39cb0340fa564285a207bc6f892db57efeb0328af0886fcc79b7210"
+    },
+    {
+      "id": "floor10",
+      "floors": [
+        10
+      ],
+      "label": "10层自用住宅",
+      "image": "floor10-俯视图.png",
+      "pixels": "1800×1800",
+      "bytes": 3465457,
+      "sha256": "015178d1703036ef8a014a57060c856b8664bf551032c3a7f2ace9aba5ee1bb3"
+    },
+    {
+      "id": "floor11",
+      "floors": [
+        11
+      ],
+      "label": "11层自用住宅（封闭厨房）",
+      "image": "floor11-俯视图.png",
+      "pixels": "1800×1800",
+      "bytes": 3439017,
+      "sha256": "9b55a8a44bec341f460a2fe0f30e4a7b949dab682778feacdce7f098895df73d"
+    }
+  ],
+  "layout_basis": {
+    "standard_2_9": "同一标准层户型复用，不将2–9层误判为8个不同平面",
+    "floor10": "自用住宅，按用户确认的10层命名",
+    "floor11": "自用住宅，封闭厨房，吧台不作为超大开放式岛台"
+  },
+  "limits": [
+    "俯视图用于设计展示和布局核对，不替代施工图或现场测量",
+    "各图为修正版模型的轴测渲染，未在本轮重新进行Blender高分辨率重渲染"
+  ]
+}

@@ -11,6 +11,7 @@
 - 全屋室内全景与轻奢材质方案：**https://rossbool.github.io/house3d/panorama/**
 - 单文件离线全景：[下载 HTML](https://github.com/RossBool/house3d/releases/download/offline-tour-2026-10-12/house3d-offline.html)（约 116 MB；下载完成后用桌面浏览器打开，无需本地服务器）。
 - 新版实景展示：**https://rossbool.github.io/house3d/**
+- 各楼层3D实景渲染俯视图：**https://rossbool.github.io/house3d/topview/**（2–9层标准出租层、10层自用、11层自用）
 - 旧版逐层模型：https://rossbool.github.io/house3d/v1/
 
 每次推送代码到 `main` 分支后，GitHub Pages 会自动重新构建（约 1 分钟内生效）。
