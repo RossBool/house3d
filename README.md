@@ -1,4 +1,4 @@
-# house3d · 周湍淇住宅楼 3D 展示
+# house3d · 周家住宅楼 3D 展示
 
 「周湍淇住宅楼」的 Web 3D 展示站点，基于 Three.js。
 
